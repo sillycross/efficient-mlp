@@ -1218,6 +1218,8 @@ struct Node {
 So always spending 32 bytes to store a bitmap seems too much a waste. 
 Instead, we will always have slots of size 24 bytes, 
 and ``small nodes'' which occupies one slot, and ``large nodes'' which occupies 2 slots. 
+It is possible to have finer-grained node sizes, as discussed in paragraph \ref{variantsizehash}, 
+but for now we only consider two node sizes for ease of understanding and implementation.
 
 Small nodes are nodes with no more than 8 children.
 We spend a byte to store the number of children in this node, 
@@ -1285,6 +1287,16 @@ After this optimization, we only need to access 6 layers times 2 (per cuckoo loo
 which is 13 DRAM positions in parallel, to execute a \QueryLCP for 64-bit keys, 
 which is another small performance and memory-consumption improvement.
  
+\subsubsection*{The Choice of Hash Function}
+
+Finally, we need a good hash function family.
+The hash functions should be very efficient to compute (so it doesn't drag our performance down), 
+vectorizable (since we need to compute multiple independent strings' hash value) 
+and have high quality (required for cuckoo hash scheme to reach its theoretical maximum load factor).
+While there may definitely be other choices that meet the criteria, 
+we chose xxHash \cite{xxhash}, 
+a hash function family widely used in industry that is both extremely performant and of high quality.
+
 \subsection{Evaluation} \label{mlpindex_eval}
 
 

@@ -1138,8 +1138,9 @@ The string represented by this node in the trie is its ``prefix'' concatenate it
 as shown in Figure \ref{mlpindex_node}. It turns out that we should use the ``prefix'' as a node's index 
 in the hash table. This is because at the beginning of each phase of the $D$-ary search
 we could only know the prefix of the node we want to lookup. 
-There is no way to know the path-compression string corresponding to a node
-until we locate that node in the hash table. 
+If we use the represented string as the index, we would have a chicken and egg problem as 
+there is no way to know the path-compression string corresponding to a node
+until we locate that node in the hash table, which we can't because we don't know the path-compression string. 
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{mlpindex_node.png}
@@ -1178,8 +1179,8 @@ struct Node {
 \end{minted}
 \end{codebox}\doublespacing
 
-To find the LCP, we simply query every depth of the trie. 
-Since we qeury every depth, path-compression is not a issue for us.
+To find the LCP, we simply query all the $D$ levels of the trie. 
+Since we query every depth, path-compression is not a issue for us.
 After we find the LCP node $n$ in this trie, we first check if the path-compression string matches. 
 If not, then $n$ is the LCP node and we can return. Otherwise, 
 we need to recurse to the children of $n$ to find the LCP inside the children of $n$. 

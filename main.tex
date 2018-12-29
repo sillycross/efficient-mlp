@@ -618,19 +618,19 @@ struct Iterator {
 \end{codebox}\doublespacing
 
 Interestingly, one can easily show that it is impossible to leverage MLP 
-from linked-list iteration: the address of current.next.next will not be known, 
-until current.next is fetched from memory. 
+from linked-list iteration: the address of current\verb|->|next\verb|->|next will not be known, 
+until current\verb|->|next is fetched from memory. 
 This is exactly the ``worst case'' in Section \ref{specexec} where each access (directly or indirectly) depends on every access before it, 
 so the plain iterator has MLP=1.
 
 How could we get more MLP? 
 The trick is, the skiplist tower gives us a way to know about nodes further ahead: 
-current.next[k] will give us a node approximately $2^k$ steps away from current node.
+current\verb|->|next[k] will give us a node approximately $2^k$ steps away from current node.
 Of course, this only works if the tower height of current is at least $k$.
 
 So a natural idea to issue down more than one independent accesses at once is to use the level 1 tower. 
-Whenever we encounter a node $c$ with height larger than 0 (which happens with 50\% probability), we will prefetch c.next[1]. 
-If c.next[1] is not equal to c.next[0] (which happens with 50\% probability), 
+Whenever we encounter a node $c$ with height larger than 0 (which happens with 50\% probability), we will prefetch c\verb|->|next[1]. 
+If c\verb|->|next[1] is not equal to c\verb|->|next[0] (which happens with 50\% probability), 
 then we prefetched something useful. This allows us to have MLP=2 with 25\% probability, and MLP=1 otherwise, 
 resulting in an overall MLP of 1.25, as shown below.
 
@@ -785,7 +785,7 @@ lockfree skiplist implementation gaurantees that
 at any point each layer is always a valid linked list even in the presence of deletes, 
 and the memory are reclaimed using epochs, 
 so the references we hold will also remain valid all the time. 
-There is only one issue with delete: the ``while (current == q.Head().start)'' line in advance iterator 
+There is only one issue with delete: the ``\verb|while (current == q.Head().start)|'' line in advance iterator 
 may never be true, if the q.Head().start were physically in the skiplist when it was pushed into queue, 
 but deleted and physically removed from the skiplist by concurrent threads later. 
 The solution is to instead simply execute the prefetch phase every $2^K$ advances. 
@@ -861,11 +861,21 @@ and has a memory consumption of $O(n\cdot \log_D\log M)$.
 
 To the best of our knowledge, \MlpIndex is practically the fastest ordered index. 
 It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
-the state-of-the-art index published in 2018. 
-On a data set of 80 million elements, \MlpIndex only takes around 2 DRAM roundtrip time to perform 
+the state-of-the-art index published in 2018, on all operations,
+and about 4.5x faster than Adaptively Radix Tree (ART) \cite{arttrie_icde13}. 
+On a data set of 80 million 64-bit keys, \MlpIndex only takes around 2 DRAM roundtrip time to perform 
 an \insertion or \lookup, and around 3 DRAM roundtrip time to perform an \lowerbound.
 We note that even a cheater who can somehow know the address where the answer to a query is stored for free 
-will still need 1 DRAM roundtrip to read that answer. 
+will still need 1 DRAM roundtrip to read that answer.
+Our superior speed 
+comes from a combination of theoretical algorithm re-designs to leverage memory level parallelism, 
+and pratical optimizations including a specially-modified hash table scheme, 
+and using bitmaps to increases the fanout of the trie tree to 256.
+For 64-bit keys, our algorithm only makes 6 parallel hash table lookups, 
+which boil down to at most 12 independent parallel DRAM accesses in our implementation,
+to execute a \lookup query. \lowerbound requires only one additional DRAM access
+depending on the lookup results. \insertion only writes to cache-resident addresses after the lookup 
+if there is no hash table movement due to conflict.
 
 \MlpIndex is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
@@ -907,8 +917,29 @@ In its essense, a x-fast trie is a plain binary trie that carries a few extra in
 \item Min/Max: records the leaf corresponding to minimum/maximum key in this subtree.
 \item Prev/Succ: if the node is a leaf, records the prev/succ leaf (the ``leaf-link'').
 \end{itemize}
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+// A Node for x-fast trie based on original idea
+struct Node {
+    // parent node
+    Node* parent;
+    // two child nodes corresponding to 0 and 1
+    Node* child[2];
+    // min and max leaf in this subtree
+    Node *min, *max;
+    // previous and successor key if this node is leaf
+    Node *prev, *succ;
+    // the prefix that this node represents in the trie
+    Key prefix;
+    // the height of this node in trie
+    int height;
+};
+\end{minted}
+\end{codebox}\doublespacing
+
 Those information are dynamically updated using the information stored in its 0/1 children, 
-for example, if one of the children of node $n$ is modified, one can update the Min field of $n$ 
+for example, if one of the children of node $n$ is modified, one can update n\verb|->|min
 using the logic described in the following straight-forward pseudocode:
 
 \singlespacing\begin{codebox}
@@ -944,20 +975,21 @@ Suppose the LCP has length $k$ and the node of LCP is $n$.
 Since $n$ is the LCP, $n$ must not have child $x[k]$, as otherwise there will be a longer common prefix. 
 However, $n$ must have child $1-x[k]$, since $n$ is the prefix of some key in the trie. 
 If $x[k]=0$, then $x$ is smaller than everything in this subtree, 
-so the desired lower bound of $x$ is the minimum node in this subtree (n.min). 
+so the desired lower bound of $x$ is the minimum node in this subtree (n\verb|->|min). 
 If $x[k]=1$, then $x$ is larger than everything in this subtree, 
-so the lower bound of $x$ is the smallest node larger than the maximum node (n.max.succ). 
+so the lower bound of $x$ is the smallest node larger than the maximum node (n\verb|->|max\verb|->|succ). 
 This results in the following pseudocode:
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
 Node* Lower_Bound(Key x) {
     int len; Node* n;
-    (len, n) = QueryLCP(x);
+    std::tie(len, n) = QueryLCP(x);
     if (len == logM) {
         // the key exists in the trie
         return n;
     }
+    // x[len] represent the bit "len" of x
     if (x[len] == 0) {
         return n->min;
     } else {
@@ -986,8 +1018,10 @@ bool Insert(Key x) {
     Node* succ = Lower_Bound(x);
     // Construct nodes all the way to the leaf
     for (int i = len; i < logM; i++) {
-        n->child[x[i]] = new Node(....);
-        n = n->child[x[i]];
+        Node* newNode = new Node(....);
+        n->child[x[i]] = newNode;
+        hashTable.Insert(newNode);
+        n = newNode;
     }
     // Update leaf-links
     n->succ = succ; n->prev = succ->prev;
@@ -1008,8 +1042,9 @@ In this section, we present the two core ideas that build up the theoretical asp
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
 \item Use $D$-ary search to replace binary search in \QueryLCP for high memory level parallelism.
-This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log\log M)$ to $O(\log_D\log M)$.
-\item Support path compression for lower insertion cost and memory consumption. 
+This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log\log M)$ to $O(\log_D\log M)$, 
+with $D$ parallel requests sent in each roundtrip.
+\item Support path compression (also known as ``Patricia'' \cite{patricia}) for lower insertion cost and memory consumption. 
 This reduces \insertion cost from $O(\log M)$ to $O(\log_D\log M)$ DRAM roundtrips and $O(D\cdot \log_D\log M)$ CPU work, 
 and reduces memory consumption of the data structure from $O(n\cdot\log M)$ to $O(n\cdot\log_D\log M)$.
 \end{itemize}
@@ -1055,13 +1090,24 @@ so the trie may contain at most $O(n\cdot \log_D\log M)$ nodes.
 While the above point-of-view explains the memory consumption straightforwardly, 
 it may be easier to understand the algorithm conceptually 
 by looking at an equivalent algorithm built in a recursive way. 
-We build a path-compressed trie tree of depth $D$, with each node has a fanout of $2^{\log M/D}$, 
+We build a path-compressed trie tree of depth $D$, with each node has a fanout of $2^{(\log M)/D}$, 
 and the same data structure is used recursively to maintain the list of children of each node.
 The special case is the root node with only one child -- 
 this correspond to the ``intermediate'' nodes due to incomplete path compression, which only has one child. 
 We should not create further intermediate nodes for those intermediate nodes, 
 so we need to treat them specially -- since it can only happen on the root node, 
 we can just store the key directly in that case. 
+
+Note that in practice, we do not necessarily use the same data structure recursively to manage the children of a node. 
+We can use different structures according to the size of the key universe. 
+Specifically, in 64-bit key case, we have $D=8$ trie tree as outer-level data structure 
+that results in a node fanout of 256. 
+The trie tree turns out to be too heavy-weighted to be used as the inner-level structure, 
+since the key universe has a size of only 256.
+We use either a list of children (if the number of children is small) 
+or a bitmap to maintain the children list as our inner-level data structure. 
+This is elaborated in the ``Lowest Level Bitmap'' idea in paragraph \ref{lowestlevelbitmap}.
+ 
 To find the LCP, we simply query every depth of the trie. 
 Since we qeury every depth, path-compression is not a issue for us.
 After we find the LCP node $n$, we recurse to the children of $n$ to find the LCP inside the children of $n$. 
@@ -1077,8 +1123,8 @@ int QueryLCP(Tree* t, Key x) {
     if (x.len == 1) {
         return 0;
     }
-    // termination case (node with only 1 child):
-    // This can only happen on the root of a subtree,
+    // termination case (subtree with only 1 element):
+    // This can only happen on the root of its parent tree,
     // every other node must has >=2 child due to path-compression
     if (t.IS_SINGLE_ELEMENT) {
         return lcp(x, t.ELEMENT);
@@ -1146,7 +1192,7 @@ However, we implemented the out-of-box experiment that
 demostrated the memory consumption we can achieve with a modified bucketized cuckoo, 
 which we will discuss in paragraph \ref{variantsizehash}.
 
-\subsubsection*{Lowest Level Bitmap}
+\subsubsection*{Lowest Level Bitmap} \label{lowestlevelbitmap}
 
 In \MlpIndex, we recurse to a subset of bits after a parallel hash table lookup. 
 When the number of bits are small enough (say, $\leq 8$), we may use a bitmap 
@@ -1298,6 +1344,16 @@ we chose xxHash \cite{xxhash},
 a hash function family widely used in industry that is both extremely performant and of high quality.
 
 \subsection{Evaluation} \label{mlpindex_eval}
+
+In this section, we benchmark \MlpIndex on 64-bit keys against two fastest ordered index 
+structures we are aware of -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
+We did not benchmark against comparison-based data structures such as the B-tree variants, 
+since they are much slower on 64-bit keys than HOT and ART, as shown in both papers \cite{hot_sigmod18, arttrie_icde13}.
+We also compare \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
+with its practical performance. Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
+
+
+ 
 
 
 \section{Conclusion} \label{conclusion}

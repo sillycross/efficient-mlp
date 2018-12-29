@@ -882,14 +882,19 @@ if there is no hash table movement due to conflict.
 \MlpIndex is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
 $O(\log \log M)$ per operation is the lower bound in time to support both \insertion and \lowerbound operation. 
-While we could improve our \lookup operation to $O(1)$ by simply building a stand-alone hash table to hold all keys, 
-we deem it as unnecessary since in practice our native $O(\log_D\log M)$ \lookup is 
-already almost as fast as a carefully-engineered hash table could do.
+
+For use cases that requires both \lookup and \lowerbound, 
+a common strategy is to build a stand-alone hash table to support $O(1)$ \lookup, 
+in addition to the ordered index that supports \lowerbound, 
+since the native \lookup operation in ordered index can be much slower than a hash table.
+This strategy is applied in industrial in-memory storage engines like Redis \cite{redis}.
+However, it is unnecessary for us to build the stand-alone hash table at the cost of slower \insertion and extra memory, 
+because in practice our native $O(\log_D\log M)$ \lookup is already almost as fast as a carefully-engineered hash table could do.
 
 The core idea of \MlpIndex is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
-X-fast trie supports $O(\log M)$ \insertion, $O(1)$ \lookup, $O(\log\log M)$ \lowerbound, while using $O(n\log M)$ memory.
-While its \lookup and \lowerbound performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
-its huge memory consumption as well as huge constants hidden in the algorithm made it not considered useful in practice. 
+X-fast trie supports $O(\log M)$ \insertion and $O(\log\log M)$ \lowerbound, while using $O(n\log M)$ memory.
+While its \lowerbound performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
+its huge constants hidden in the algorithm as well as huge memory consumption made it not considered useful in practice. 
 Indeed, the algorithm proposed in the original paper requires 64 hash table nodes to store a 64-bit key, 
 and each hash table node needs to store the information of 4 pointers and 5 keys. 
 That's already 4.5KB in space (550x larger than the original key size), 
@@ -954,7 +959,7 @@ if (n->IsLeaf) {
 } else if (n->child[0] != nullptr) {
     n->min = n->child[0]->min;
 } else {
-   n->min = n->child[1]->min;
+    n->min = n->child[1]->min;
 }
 \end{minted}
 \end{codebox}\doublespacing
@@ -1397,7 +1402,7 @@ When the ``main node'' itself is evicted by cuckoo replacement, it frees the slo
 and steals another slot (or fall back to pointer indirection) near the slot it is moved to.
  
 Each big node of degree $\geq 8$ consumes 48 bytes of memory, but the total number of ``degrees'' in the trie is fixed 
--- it is always the number of nodes in the trie tree minus 1, which is $2n-1$. 
+-- it is always the number of nodes in the trie tree minus 1, which is no larger than $2n-1$. 
 Since $48/8<24/2$, memory usage is peaked when all nodes are small nodes, 
 and the total memory used by the data structure is bounded by 24 bytes times $2n$ nodes over 50\% load factor, 
 which is 96 bytes per 8-byte key.
@@ -1458,8 +1463,31 @@ since they are much slower on 64-bit keys than HOT and ART, as shown in both pap
 We also compare \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
 with its practical performance. Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
 
+We use a family of data distribution similar to the ones used in \cite{masstree}, which \cite{masstree} calls ``decimal distribution''. 
+In this distribution, we generate the key byte by byte, and each byte is randomly selected from a set of candidates, 
+which may vary depending on the position of this byte in the key.
+The trie tree built from this distribution have both high-degree and low-degree nodes, 
+and while path compression can help lower the height of the trie, it will not ``collapse'' the trie 
+to essentially a big flat array like the uniform random distribution would. 
+As such, we believe this distribution family is a balanced test that 
+benchmarks multiple components of trie-based data structures and does not over-emphasize a certain component. 
 
- 
+Due to time limitation, we only tested two such distributions. 
+In distribution $A$, the first 6 bytes have a small candidate set of a few elements for each byte, 
+and the last 2 bytes have a large candidate set of around 100 elements. 
+Distribution $B$ is mirror to $A$: the first 2 bytes have a large candidate set of around 100 elements,
+while the last 6 bytes have a small candidate set of a few elements for each byte.
+Both data set contains 80 million elements.
+
+\lookup queries are generated as a mix of keys sampled directly from the data set (so the \lookup must yield positive result),
+and keys sampled from the same distribution that generated the data set (so it exists in the original data set 
+with only a small probability). The final positive rate is controlled to be around 80\%. 
+\lowerbound queries are sampled from the same distribution as the original data set is generated. 
+
+Our benchmark rivals are Height Optimized Trie (HOT) \cite{hot_sigmod18} 
+and Adaptive Radix Tree (ART) \cite{arttrie_icde13}, two fastest state-of-the-art 
+ordered index structures to the best of our knowledge.
+
 
 
 \section{Conclusion} \label{conclusion}

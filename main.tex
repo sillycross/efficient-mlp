@@ -889,7 +889,8 @@ in addition to the ordered index that supports \lowerbound,
 since the native \lookup operation in ordered index can be much slower than a hash table.
 This strategy is applied in industrial in-memory storage engines like Redis \cite{redis}.
 However, it is unnecessary for us to build the stand-alone hash table at the cost of slower \insertion and extra memory, 
-because in practice our native $O(\log_D\log M)$ \lookup is already almost as fast as a carefully-engineered hash table could do.
+because in practice our native $O(\log_D\log M)$ \lookup is already almost as fast as a carefully-engineered hash table could do, 
+as shown in Section \ref{mlpindex_eval}.
 
 The core idea of \MlpIndex is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
 X-fast trie supports $O(\log M)$ \insertion and $O(\log\log M)$ \lowerbound, while using $O(n\log M)$ memory.
@@ -1487,7 +1488,77 @@ with only a small probability). The final positive rate is controlled to be arou
 Our benchmark rivals are Height Optimized Trie (HOT) \cite{hot_sigmod18} 
 and Adaptive Radix Tree (ART) \cite{arttrie_icde13}, two fastest state-of-the-art 
 ordered index structures to the best of our knowledge.
+We also benchmark our performance against hash table, which cannot support \lowerbound queries. 
+We included two hash table implementations, specifically, google's dense\_hash\_map \cite{densehashmap}, 
+and the cuckoo hash that is used in \MlpIndex.
 
+In order to more accurately measure the time need to execute one operation, 
+we want to make sure that each query is indeed executed ``independently'', 
+so the total time over number of queries indeed reflects what it takes to execute one query. 
+To see what it means, we will use the cuckoo hash table as an example. 
+Recall that each cuckoo hash lookup simply looks like this:
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+bool Lookup(Key x) {
+    uint32_t hash1 = HashFn1(x), hash2 = HashFn2(x);
+    return table[hash1].key == x || table[hash2].key == x;
+}
+\end{minted}
+\end{codebox}\doublespacing
+
+If one simply write the following code to benchmark the time needed per lookup, 
+one will unfortunately get deceptive results.
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+START_TIMING();
+for (int i = 0; i < N; i++) { 
+    result[i] = Lookup(data[i]);
+}
+END_TIMING();
+\end{minted}
+\end{codebox}\doublespacing
+
+Not only the compiler will unroll the loop and arbitrarily interleave the instructions, 
+the CPU's out-of-order execution mechanism will do it as well. 
+While it is unlikely for the CPU and compiler to take this advantage in real-world applications, 
+since there are likely a lot of application logic and data dependencies between two hash table queries, 
+they will take this advantage thanks to the tight and logic-less benchmark loop, and give out deceptive results. 
+The solution is to use the same trick as in Section \ref{understandmlp}. 
+We will hide the query text from compiler optimization and CPU out-of-order and speculative execution by 
+XORing it with the correct answer to the previous query. 
+Now the CPU cannot know what the next query is until it completes the execution of the previous one and yield the answer, 
+thus ``total time over number of query'' actually represents the time to execute one query. 
+This results in a code like this:
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+// "Encrypt" query input with the 
+// expected result of the previous query
+for (int i = 1; i < N; i++) {
+    data[i] ^= expected_result[i-1];
+}
+// benchmark loop
+START_TIMING();
+uint64_t lastAnswer = 0;
+for (int i = 0; i < N; i++) { 
+    // "Decrypt" query input by the correct 
+    // answer to the previous query 
+    uint64_t realInput = data[i] ^ lastAnswer;
+    lastAnswer = Lookup(realInput);
+    result[i] = lastAnswer;
+}
+END_TIMING();
+\end{minted}
+\end{codebox}\doublespacing
+
+We note that this ``query encryption'' only make significant difference on hash table, mainly due to its simple logic. 
+For ordered index, all benchmarked implementation, including \MlpIndex, becomes slower, but only by a small degree. 
+This is as expected: since CPU speculative execution only have a small window, it is not surprising that it 
+cannot penetrate complicated logic effectively. 
+
+The benchmark results can be found in Table \ref{mlpindex_results}.
 
 
 \section{Conclusion} \label{conclusion}

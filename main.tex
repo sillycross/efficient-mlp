@@ -1085,10 +1085,10 @@ Then one will see that prefix length $0,2$ exists in the hash table,
 but $1,3$ does not. Binary search no longer works.
 
 So we have to do an ``incomplete'' path compression. 
-When we perform a path compression, 
+When we insert a new node at depth $k$,
 for each $D$-ary search depth $d$,
-we must create a intermediate node at the largest prefix lengths where search $d$ will check, 
-so that the search will see that node. 
+we must create a intermediate node at the largest depth smaller than $k$ that search $d$ will check, 
+so that the search can narrow down correctly without missing the new node. 
 Since the $D$-ary search takes $\log_D\log M$ steps to complete, 
 now we need to create at most $O(\log_D\log M)$ intermediate nodes for each new node inserted, 
 so the trie may contain at most $O(n\cdot \log_D\log M)$ nodes. 
@@ -1098,7 +1098,7 @@ We need to make sure that $D$-ary search will be able to find the new node.
 The $D$-ary search will check the nodes labeled ``1'' first. 
 In order for the search to not miss our red node, we need to materialize the ``1'' node before to our newly inserted node. 
 Then the search will check the two nodes labeled ``2'' in second phase, and the last two nodes labeled ``3'' in third phase,
-so similarily we need to materialize the ``2'' and ``3'' node before our newly inserted node.
+so similarily we need to materialize the ``2'' and ``3'' node before our newly inserted node (the green nodes).
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{intermediate_nodes.png}
@@ -1135,12 +1135,7 @@ since now each node has a ``prefix'', which is the string represented by its par
 plus the string represented by the edge leading to this node, 
 as well as a ``path compression string'' that follows the ``prefix''. 
 The string represented by this node in the trie is its ``prefix'' concatenate its path-compression string, 
-as shown in Figure \ref{mlpindex_node}. It turns out that we should use the ``prefix'' as a node's index 
-in the hash table. This is because at the beginning of each phase of the $D$-ary search
-we could only know the prefix of the node we want to lookup. 
-If we use the represented string as the index, we would have a chicken and egg problem as 
-there is no way to know the path-compression string corresponding to a node
-until we locate that node in the hash table, which we can't because we don't know the path-compression string. 
+as shown in Figure \ref{mlpindex_node}.
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{mlpindex_node.png}
@@ -1149,6 +1144,12 @@ Blue nodes are real nodes, hollow nodes are contracted nodes by path compression
 \label{mlpindex_node}
 \end{figure}
 
+It turns out that we should use the ``prefix'' as a node's index 
+in the hash table. This is because at the beginning of each phase of the $D$-ary search
+we could only know the prefix of the node we want to lookup. 
+If we use the represented string as the index, we would have a chicken and egg problem as 
+there is no way to know the path-compression string corresponding to a node
+until we locate that node in the hash table, which we can't because we don't know the path-compression string. 
 This leads to a node prototype as shown in the pseudocode below:
 
 \singlespacing\begin{codebox}
@@ -1233,9 +1234,10 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
 
 \lookup operation can be built directly upon \QueryLCP, 
 since all we need to check is whether n\verb|->|fullKey is exactly the key we are looking for, 
-where n is the LCP node, as shown below.
+where n is the LCP node.
 However, note that it is incorrect to simply query if $x$ exists in root\verb|->|hashTable, 
 since the index in the hash table does not include the path-compression string part.
+The pseudocode can be found below.
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
@@ -1247,7 +1249,12 @@ bool Lookup(Node* root, Key x) {
 \end{minted}
 \end{codebox}\doublespacing
 
-Inserting into this data structure is also straightforward conceptually. 
+\lowerbound operation can also be built upon \QueryLCP and the extra information 
+carried on the node, using identical idea as the original x-fast trie. We omit the pseudocode.
+
+Inserting into the data structure is conceptually very similar to how one inserts into a conventional 
+path-compressed trie.
+The only difference is that in our case the children of a node are managed by a recursive data structure. 
 One first insert the ``splitting point'' node if it were a contracted node before,  
 then insert the key as a new child of the splitting point node, 
 which is recursively inserting into the sub-data-structure that manages the children of the splitting point, 

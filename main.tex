@@ -868,22 +868,27 @@ an \insertion or \lookup, and around 3 DRAM roundtrip time to perform an \lowerb
 We note that even a cheater who can somehow know the address where the answer to a query is stored for free 
 will still need 1 DRAM roundtrip to read that answer.
 Our superior speed 
-comes from a combination of theoretical algorithm re-designs to leverage memory level parallelism, 
-and pratical optimizations including a specially-modified hash table scheme, 
-and using bitmaps to increases the fanout of the trie tree to 256.
+comes from a combination of algorithm-level designs to leverage memory level parallelism, 
+and various engineering-level optimizations including a specially-modified hash table scheme, 
+and adaptively choosing different data structures for high-degree and low-degree nodes 
+to minimize the constants hidden in the algorithm.
 For 64-bit keys, our algorithm only makes 6 parallel hash table lookups, 
 which boil down to at most 12 independent parallel DRAM accesses in our implementation,
 to execute a \lookup query. \lowerbound requires only one additional DRAM access
-depending on the lookup results. \insertion only writes to cache-resident addresses after the lookup 
+depending on the lookup results. 
+\insertion only writes to cache-resident addresses after the lookup 
 if there is no hash table movement due to conflict.
 
 \MlpIndex is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
-$O(\log \log M)$ per operation is the lower bound to support the operations of an ordered index. 
+$O(\log \log M)$ per operation is the lower bound in time to support both \insertion and \lowerbound operation. 
+While we could improve our \lookup operation to $O(1)$ by simply building a stand-alone hash table to hold all keys, 
+we deem it as unnecessary since in practice our native $O(\log_D\log M)$ \lookup is 
+already almost as fast as a carefully-engineered hash table could do.
 
 The core idea of \MlpIndex is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
-X-fast trie supports $O(\log M)$ \insertion, $O(\log\log M)$ \lookup and \lowerbound, while using $O(n\log M)$ memory.
-While its $O(\log\log M)$ lookup performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
+X-fast trie supports $O(\log M)$ \insertion, $O(1)$ \lookup, $O(\log\log M)$ \lowerbound, while using $O(n\log M)$ memory.
+While its \lookup and \lowerbound performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
 its huge memory consumption as well as huge constants hidden in the algorithm made it not considered useful in practice. 
 Indeed, the algorithm proposed in the original paper requires 64 hash table nodes to store a 64-bit key, 
 and each hash table node needs to store the information of 4 pointers and 5 keys. 
@@ -894,7 +899,7 @@ an improvement over x-fast trie that improved the \insertion performance to $O(\
 the improvement is mainly theoretical and introduces even larger constants hidden in the big-O notation. 
 We are not aware of any attempts to implement x-fast trie or y-fast trie as a practically usable data structure. 
 
-We did not use the ideas in y-fast trie. Our insertion performance already matches that of y-fast trie, 
+We did not use the ideas in y-fast trie. Our insertion complexity already matches that of y-fast trie, 
 and while our memory consumption is worse than y-fast trie in big-O notation, 
 we would like to note that the constants hidden in the big-O is much smaller.
 Specifically, in practice, we use at most 96 bytes (and can be further reduced to 36 bytes) to store a 8-byte key. 
@@ -956,10 +961,11 @@ if (n->IsLeaf) {
 
 Furthermore, all the trie nodes are put into a hash table, indexed by the ``Prefix'' field of the node. 
 This allows one to directly locate a node that corresponds to a given prefix in $O(1)$, without the need to walk through the path 
-to that node from the root. 
+to that node from the root. This also allows $O(1)$ \lookup 
+since a \lookup is simply checking whether a leaf node exists in the hash table.
 
 The core operation of x-fast trie is \QueryLCP (LCP stands for longest common prefix): 
-given a key $x$, find the length of the longest prefix $x$, 
+given a key $x$, find the length of the longest prefix of $x$, 
 such that the prefix corresponds to a node in the trie. The most naive way to support \QueryLCP is to just 
 start from the root and move down according to the bits of $x$. When a child does not exist, 
 the height of the current node is the desired result. This takes $O(\log M)$ per query.
@@ -971,7 +977,7 @@ So we can binary search on that length and query the hash table to know if a pre
 This reduces the time complexity to $O(\log\log M)$. 
 
 We can support \lowerbound in $O(\log\log M)$ based on \QueryLCP. 
-Suppose the LCP has length $k$ and the node of LCP is $n$. 
+Suppose the LCP has length $k$ bits and the node of LCP is $n$. 
 Since $n$ is the LCP, $n$ must not have child $x[k]$, as otherwise there will be a longer common prefix. 
 However, $n$ must have child $1-x[k]$, since $n$ is the prefix of some key in the trie. 
 If $x[k]=0$, then $x$ is smaller than everything in this subtree, 
@@ -1086,6 +1092,22 @@ so that the search will see that node.
 Since the $D$-ary search takes $\log_D\log M$ steps to complete, 
 now we need to create at most $O(\log_D\log M)$ intermediate nodes for each new node inserted, 
 so the trie may contain at most $O(n\cdot \log_D\log M)$ nodes. 
+As an example, Figure \ref{intermediate_nodes} illustrates what happens when we want to insert
+a new node (the red one) when $D=3$. 
+We need to make sure that $D$-ary search will be able to find the new node. 
+The $D$-ary search will check the nodes labeled ``1'' first. 
+In order for the search to not miss our red node, we need to materialize the ``1'' node before to our newly inserted node. 
+Then the search will check the two nodes labeled ``2'' in second phase, and the last two nodes labeled ``3'' in third phase,
+so similarily we need to materialize the ``2'' and ``3'' node before our newly inserted node.
+
+\begin{figure}[!htb]
+  \includegraphics[width=\linewidth]{intermediate_nodes.png}
+\caption{Illustration of the intermediate nodes (green nodes) needed when creating a new node (the red node), $D=3$. 
+All nodes above were contracted by path compression initially.
+The number on the nodes denote in which phase of $D$-ary search 
+it will potentially be checked (the unlabeled nodes are potentially checked in 4-th phase).}
+\label{intermediate_nodes}
+\end{figure}
 
 While the above point-of-view explains the memory consumption straightforwardly, 
 it may be easier to understand the algorithm conceptually 
@@ -1106,44 +1128,120 @@ The trie tree turns out to be too heavy-weighted to be used as the inner-level s
 since the key universe has a size of only 256.
 We use either a list of children (if the number of children is small) 
 or a bitmap to maintain the children list as our inner-level data structure. 
-This is elaborated in the ``Lowest Level Bitmap'' idea in paragraph \ref{lowestlevelbitmap}.
+This is elaborated in Section \ref{mlpindex}.
  
+Another question arise from path compression is how we should index our node in the hash table, 
+since now each node has a ``prefix'', which is the string represented by its parent node 
+plus the string represented by the edge leading to this node, 
+as well as a ``path compression string'' that follows the ``prefix''. 
+The string represented by this node in the trie is its ``prefix'' concatenate its path-compression string, 
+as shown in Figure \ref{mlpindex_node}. It turns out that we should use the ``prefix'' as a node's index 
+in the hash table. This is because at the beginning of each phase of the $D$-ary search
+we could only know the prefix of the node we want to lookup. 
+There is no way to know the path-compression string corresponding to a node
+until we locate that node in the hash table. 
+
+\begin{figure}[!htb]
+  \includegraphics[width=\linewidth]{mlpindex_node.png}
+\caption{Illustration of the correct way to index nodes in hash table after we apply path-compression.
+Blue nodes are real nodes, hollow nodes are contracted nodes by path compression.}
+\label{mlpindex_node}
+\end{figure}
+
+This leads to a node prototype as shown in the pseudocode below:
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+struct Node {
+    // The length of key in bits for this key universe
+    int len;
+    // The index into the hash table
+    Key prefix;
+    // The string represented by this node
+    // which is prefix + path-compressed string
+    Key fullKey;
+    // The hash table for this DS, shared by all nodes in this DS
+    HashTable* hashTable;
+    // Additional information as in original x-fast trie
+    // Min and max node in this subtree
+    Node* min, max;
+    // Leaf-links if this node is a leaf
+    Node* prev, succ;
+    // Whether or not this is a special ``intermediate node''
+    // if it is, then it must be the root of its parent DS,
+    // and fullKey is the only key stored in this DS
+    bool isSpecialIntermediateNode;
+    // A recursive DS to manage the children of this node
+    // The recursive DS works on a key universe of length len / D
+    Node* children;
+};
+\end{minted}
+\end{codebox}\doublespacing
+
 To find the LCP, we simply query every depth of the trie. 
 Since we qeury every depth, path-compression is not a issue for us.
-After we find the LCP node $n$, we recurse to the children of $n$ to find the LCP inside the children of $n$. 
+After we find the LCP node $n$ in this trie, we first check if the path-compression string matches. 
+If not, then $n$ is the LCP node and we can return. Otherwise, 
+we need to recurse to the children of $n$ to find the LCP inside the children of $n$. 
 In each step we query $D$ independent hash table positions, and the recurse ends in $O(\log_D\log M)$ steps, 
 resulting in a complexity of $O(\log_D\log M)$ DRAM roundtrips and $O(D\cdot\log_D\log M)$ CPU work,
-as shown in the pseudocode below (in which it assumes for simplicity that the length of key is a power of $D$).
+as shown below (in which it assumes for simplicity that the length of key is a power of $D$).
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
 // Recursive QueryLCP on path-compressed trie
-int QueryLCP(Tree* t, Key x) {
+// t is the root of the data structure that 
+// stores the bits [currentDepth, currentDepth + t->len) of 
+// all keys starting with bits x[0:currentDepth)
+// Returns the LCP node n, 
+// the length of LCP is lcp(n->fullKey, x)
+Node* QueryLCP(Node* t, Key x, int currentDepth) {
     // termination case (reached last level):
-    if (x.len == 1) {
-        return 0;
+    if (t->len == 1) {
+        return t;
     }
-    // termination case (subtree with only 1 element):
-    // This can only happen on the root of its parent tree,
-    // every other node must has >=2 child due to path-compression
-    if (t.IS_SINGLE_ELEMENT) {
-        return lcp(x, t.ELEMENT);
+    // termination case (intermediate node):
+    if (t.isSpecialIntermediateNode) {
+        return t;
     }
-    int depth = 0; 
-    Tree* subtree = t.root;
+    Node* lcpNode = t;
     // Query every depth of the trie to find LCP
-    // Those queries are independent
-    int step = x.len / D;
+    // Those queries are independent and the DRAM accesses 
+    // from these queries are executed in parallel
+    int step = t->len / D;
     for (int i = 1; i < D; i++) {
-        int prefixLen = i * step;
-        if (t.hashTable.Find(x[0:prefixLen])) {
-            depth = i;
-            subtree = t.hashTable.Find(x[0:prefixLen]);
-        }
+        int len = i * step;
+        // substring [0, currentDepth+len) of x
+        Key prefixToFind = x[0:currentDepth+len];
+        Node* n = t->hashTable.Find(prefixToFind);
+        if (n != nullptr) {
+            lcpNode = n;
+        } 
+    }
+    // If the path-compression string does not fully match 
+    // corresponding parts in x, then it's already over
+    // and no need to recurse into child
+    if (x[0:lcpNode->fullKey.length()] != lcpNode->fullKey) {
+        return lcpNode;
     }
     // Recurse to find the LCP in the children of that node
-    int start = step * depth;
-    return start + QueryLCP(subtree, x[start:start+step]);
+    return QueryLCP(lcpNode->children, x[start:start+step]);
+}
+\end{minted}
+\end{codebox}\doublespacing
+
+\lookup operation can be built directly upon \QueryLCP, 
+since all we need to check is whether n\verb|->|fullKey is exactly the key we are looking for, 
+where n is the LCP node, as shown below.
+However, note that it is incorrect to simply query if $x$ exists in root\verb|->|hashTable, 
+since the index in the hash table does not include the path-compression string part.
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+// Returns whether key x exists in the data structure
+bool Lookup(Node* root, Key x) {
+    Node* n = QueryLCP(root, x, 0 /*currentDepth*/);
+    return n->fullKey == x;
 }
 \end{minted}
 \end{codebox}\doublespacing

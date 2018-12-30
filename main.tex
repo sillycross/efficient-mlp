@@ -85,6 +85,7 @@
 \newlang{\insertion}{insert\ }
 \newlang{\lookup}{lookup\ }
 \newlang{\lowerbound}{lower\_bound\ }
+\newlang{\upperbound}{upper\_bound\ }
 \newlang{\Cimple}{Cimple\ }
 \newlang{\QueryLCP}{QueryLCP\ }
 \DeclareMathOperator{\rin}{\in_{_{\textrm{R}}}}
@@ -849,24 +850,25 @@ In this section, we present \MlpIndex, an ordered index structure that supports 
 Specifically, it supports \insertion (insert an element into the set), \lookup (query if an element exists in the set) 
 and \lowerbound (find the minimum element in the set no smaller than the given element).
 \MlpIndex is not a comparison-based data structure, but an integer data structure that operates on a key universe $[0,M)$.
-While our implementation currently only supports 64-bit keys ($M=2^{64}$), it could be extended to support any short string keys as well.
+While our implementation currently only supports 64-bit keys ($M=2^{64}$), it could be extended to support any string keys as well.
 
 \MlpIndex takes a ``MLP-degree'' parameter $D$, 
 which represents the capability of the hardware to track parallel DRAM requests, 
 analogous to that B-tree takes a ``block size'' parameter that characterizes the granularity of each disk read by the hardware.
-Under the assumption that $D$ independent parallel DRAM requests can be completed in one roundtrip,
+Under the assumption that $D$ independent parallel DRAM requests, where each request only touches one cache line, can be completed in one roundtrip,
 \MlpIndex takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
 and $O(D\cdot\log_D\log M)$ CPU work to execute an \insertion, \lookup or \lowerbound,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
+If we have SIMD support on $D$-vectorized operations, the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
 To the best of our knowledge, \MlpIndex is practically the fastest ordered index. 
 It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
 the state-of-the-art index published in 2018, on all operations,
 and about 4.5x faster than Adaptively Radix Tree (ART) \cite{arttrie_icde13}. 
-On a data set of 80 million 64-bit keys, \MlpIndex only takes around 2 DRAM roundtrip time to perform 
+On a data set of 80 million 64-bit keys, single-threaded \MlpIndex only takes around 2 DRAM roundtrip time to perform 
 an \insertion or \lookup, and around 3 DRAM roundtrip time to perform an \lowerbound.
-We note that even a cheater who can somehow know the address where the answer to a query is stored for free 
-will still need 1 DRAM roundtrip to read that answer.
+We note that since the data set cannot fit into cache, 
+it is impossible for any algorithm to support the operations in less than the time of 1 DRAM roundtrip.
 Our superior speed 
 comes from a combination of algorithm-level designs to leverage memory level parallelism, 
 and various engineering-level optimizations including a specially-modified hash table scheme, 
@@ -1072,7 +1074,7 @@ We split the current interval $[l,r]$ into $D$ parts,
 and query length $l+(r-l)/D$, $l+(r-l)/D*2$, $\cdots$, $l+(r-l)/D*(D-1)$.
 The DRAM accesses from those hash table queries are independent and can be executed in parallel.
 We can then narrow down to an interval that is $1/D$ size of the original.
-This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log\log M)$ to $O(\log_D\log M)$.
+This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log_2\log M)$ to $O(\log_D\log M)$.
 
 \subsubsection*{Supporting path compression}
 
@@ -1168,8 +1170,6 @@ struct Node {
     // The string represented by this node
     // which is prefix + path-compressed string
     Key fullKey;
-    // The hash table for this DS, shared by all nodes in this DS
-    HashTable* hashTable;
     // Additional information as in original x-fast trie
     // Min and max node in this subtree
     Node* min, max;
@@ -1221,7 +1221,7 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
         int len = i * step;
         // substring [0, currentDepth+len) of x
         Key prefixToFind = x[0:currentDepth+len];
-        Node* n = t->hashTable.Find(prefixToFind);
+        Node* n = hashTable.Find(prefixToFind);
         if (n != nullptr) {
             lcpNode = n;
         } 
@@ -1327,7 +1327,7 @@ by lookup the 8 prefixes of $x$ in the hash tables.
 Then, we find the lower bound of $x[k]$ amongst the children of $n$ in the bitmap. 
 If the lower bound exists, the answer is just the minimum element stored in the corresponding subtree.
 If not, we may move back to the parent of $n$ and repeat. 
-This allows us to remove the max-key field as well as the leaf-links and save more memory. 
+This allows us to remove the leaf-links (as well as ``max'' field if one does not need to support \upperbound) to save more memory. 
 And actually we did not sacrifice performance, since moving along the leaf-link results in a costy cache miss, 
 but the above algorithm operates on cache-resident data all the time, and most of the time in practice 
 we don't have to move along the parent path for more than a few steps.
@@ -1438,9 +1438,10 @@ into \MlpIndex. All evaluations in Section \ref{mlpindex_eval} are done using th
 \subsubsection*{Flat Bitmap For Top Layers of Trie Tree}
 
 This is an extra optimization for 64-bit keys.
-The top 3 layers of the trie tree can only hold $256^3$ different nodes. 
-It would additionally save some space, as well as DRAM accesses, to simply store the first 3 layers 
-in a bitmap of $256^3$ bits ($2MB$), instead of the hash table. 
+The top 3 layers of the trie tree can only hold $256^3$ different values. 
+It would additionally save some space, as well as DRAM accesses, to simply store the first 2 layers
+in a flat array, each using a bitmap of 256 bits (32 bytes) to store which children exists. 
+This results in a bitmap of $256^2\times 32$ bytes ($2MB$), instead of the hash table. 
 After this optimization, we only need to access 6 layers times 2 (per cuckoo lookup) plus 1 (the top-layers bitmap), 
 which is 13 DRAM positions in parallel, to execute a \QueryLCP for 64-bit keys, 
 which is another small performance and memory-consumption improvement.
@@ -1458,11 +1459,22 @@ a hash function family widely used in industry that is both extremely performant
 \subsection{Evaluation} \label{mlpindex_eval}
 
 In this section, we benchmark \MlpIndex on 64-bit keys against two fastest ordered index 
-structures we are aware of -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
-We did not benchmark against comparison-based data structures such as the B-tree variants, 
+structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) 
+\footnote{While Adaptive Radix Tree (ART) could support \lowerbound queries, 
+the public-available implementation only supports prefix-search, 
+which is more restrictive than general \lowerbound. 
+As such we are unable to test the \lowerbound performance for ART.} \cite{arttrie_icde13}.
+We did not benchmark against comparison-based data structures such as the B-tree variants 
+(STX B-tree \cite{stx_btree}, FAST \cite{fast_sigmod10}, etc), 
+or Masstree \cite{masstree} (a B-tree/trie-tree hybrid data structure),
 since they are much slower on 64-bit keys than HOT and ART, as shown in both papers \cite{hot_sigmod18, arttrie_icde13}.
+Besides ordered index structures, we also benchmark our performance against hash table, which cannot support \lowerbound queries. 
+We included two hash table implementations, specifically, Google's dense\_hash\_set \cite{densehashset},
+which is a quadratic probing bucketized hash scheme widely used in industry, 
+and the cuckoo hash scheme that is used in \MlpIndex.
 We also compare \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
-with its practical performance. Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
+with its practical performance. Everything is single-threaded in the evaluation. 
+Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
 
 We use a family of data distribution similar to the ones used in \cite{masstree}, which \cite{masstree} calls ``decimal distribution''. 
 In this distribution, we generate the key byte by byte, and each byte is randomly selected from a set of candidates, 
@@ -1471,32 +1483,26 @@ The trie tree built from this distribution have both high-degree and low-degree 
 and while path compression can help lower the height of the trie, it will not ``collapse'' the trie 
 to essentially a big flat array like the uniform random distribution would. 
 As such, we believe this distribution family is a balanced test that 
-benchmarks multiple components of trie-based data structures and does not over-emphasize a certain component. 
+benchmarks multiple components of trie-based data structures and does not over-emphasize a particular component. 
 
 Due to time limitation, we only tested two such distributions. 
-In distribution $A$, the first 6 bytes have a small candidate set of a few elements for each byte, 
+In distribution $A$, the first (higher-ordered) 6 bytes have a small candidate set of 6 elements for each byte, 
 and the last 2 bytes have a large candidate set of around 100 elements. 
 Distribution $B$ is mirror to $A$: the first 2 bytes have a large candidate set of around 100 elements,
-while the last 6 bytes have a small candidate set of a few elements for each byte.
+while the last 6 bytes have a small candidate set of 6 elements for each byte.
 Both data set contains 80 million elements.
 
 \lookup queries are generated as a mix of keys sampled directly from the data set (so the \lookup must yield positive result),
 and keys sampled from the same distribution that generated the data set (so it exists in the original data set 
-with only a small probability). The final positive rate is controlled to be around 80\%. 
-\lowerbound queries are sampled from the same distribution as the original data set is generated. 
-
-Our benchmark rivals are Height Optimized Trie (HOT) \cite{hot_sigmod18} 
-and Adaptive Radix Tree (ART) \cite{arttrie_icde13}, two fastest state-of-the-art 
-ordered index structures to the best of our knowledge.
-We also benchmark our performance against hash table, which cannot support \lowerbound queries. 
-We included two hash table implementations, specifically, google's dense\_hash\_map \cite{densehashmap}, 
-and the cuckoo hash that is used in \MlpIndex.
+with only a small probability). The final positive rate for \lookup is controlled to be around 80\%. 
+Keys for \lowerbound queries are generated using the same distribution as the original data set is generated. 
+About 15\% of the \lowerbound query keys appeared in original data set, the remaining 85\% do not. 
 
 In order to more accurately measure the time need to execute one operation, 
 we want to make sure that each query is indeed executed ``independently'', 
 so the total time over number of queries indeed reflects what it takes to execute one query. 
 To see what it means, we will use the cuckoo hash table as an example. 
-Recall that each cuckoo hash lookup simply looks like this:
+Recall that each cuckoo hash lookup looks like this:
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
@@ -1512,6 +1518,7 @@ one will unfortunately get deceptive results.
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
+// A bad way to benchmark the performance of "Lookup" above
 START_TIMING();
 for (int i = 0; i < N; i++) { 
     result[i] = Lookup(data[i]);
@@ -1524,9 +1531,9 @@ Not only the compiler will unroll the loop and arbitrarily interleave the instru
 the CPU's out-of-order execution mechanism will do it as well. 
 While it is unlikely for the CPU and compiler to take this advantage in real-world applications, 
 since there are likely a lot of application logic and data dependencies between two hash table queries, 
-they will take this advantage thanks to the tight and logic-less benchmark loop, and give out deceptive results. 
+they will take this advantage in this tight and logic-less benchmark loop, and give out deceptive results. 
 The solution is to use the same trick as in Section \ref{understandmlp}. 
-We will hide the query text from compiler optimization and CPU out-of-order and speculative execution by 
+We will hide the query text from compiler reordering and CPU out-of-order and speculative execution by 
 XORing it with the correct answer to the previous query. 
 Now the CPU cannot know what the next query is until it completes the execution of the previous one and yield the answer, 
 thus ``total time over number of query'' actually represents the time to execute one query. 
@@ -1553,9 +1560,9 @@ END_TIMING();
 \end{minted}
 \end{codebox}\doublespacing
 
-We note that this ``query encryption'' only make significant difference on hash table, mainly due to its simple logic. 
-For ordered index, all benchmarked implementation, including \MlpIndex, becomes slower, but only by a small degree. 
-This is as expected: since CPU speculative execution only have a small window, it is not surprising that it 
+We note that this ``query encryption'' only make significant (2.5x) difference on hash table, mainly due to its extremely simple logic. 
+For ordered index, all benchmarked implementation, including \MlpIndex, becomes slower, but only by a small degree (less than 10\%). 
+This is as expected: since CPU speculative execution only have a small window, it is unsurprising that it 
 cannot penetrate complicated logic effectively. 
 
 The benchmark results can be found in Table \ref{mlpindex_results}.

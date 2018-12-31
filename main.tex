@@ -81,11 +81,14 @@
 \newlang{\verify}{Verify}
 \newlang{\sk}{sk}
 \newlang{\B}{B}
+\newlang{\MlpPQ}{MlpPQ\ }
 \newlang{\MlpIndex}{MlpIndex\ }
 \newlang{\insertion}{insert\ }
 \newlang{\lookup}{lookup\ }
 \newlang{\lowerbound}{lower\_bound\ }
 \newlang{\upperbound}{upper\_bound\ }
+\newlang{\simdgather}{gather\ }
+\newlang{\simdscatter}{scatter\ }
 \newlang{\Cimple}{Cimple\ }
 \newlang{\QueryLCP}{QueryLCP\ }
 \DeclareMathOperator{\rin}{\in_{_{\textrm{R}}}}
@@ -268,7 +271,7 @@ we provide 3 examples of our ``MLP-grounded'' data structures -- a lock-free ski
 a priority queue, and an ordered index. All of our data structures have identical APIs as their traditional counterparts.
 In Section \ref{sliter}, we present how to speed up lock-free skiplist iteration via memory level parallelism. 
 We employed our technique in MemSQL \cite{memsql},
-a commercial main-memory database that uses lock-free skiplist as their index data structure \cite{memsqladamblog}, 
+a commercial main-memory database that uses lock-free skiplist \cite{lockfree_skiplist} as their index data structure \cite{memsqladamblog}, 
 and demostrated that our technique achieves up to 1.9x single-threaded end-to-end query time speedup, and 1.5x to 1.9x
 total throughput when running on all cores.
 In Section \ref{priorityqueue}, we present a priority queue based on the binary heap, 
@@ -286,7 +289,7 @@ We also note that while most of the current state-of-the-arts ordered index are 
 which makes their performance inheritally dependent on the input data distribution, 
 the nature of our approach makes its performance independent of the input data, 
 and we are still 2 to 3 times faster even if comparing our worst case against the best case of our benchmark rivals.
-In Section \ref{conclusion}, we conclude this paper with a few directions of possible future works.
+In Section \ref{futureworks} and \ref{conclusion}, we conclude this paper with a few directions of possible future works.
 
 \section{Understanding MLP in Real World} \label{understandmlp}
 
@@ -855,11 +858,12 @@ While our implementation currently only supports 64-bit keys ($M=2^{64}$), it co
 \MlpIndex takes a ``MLP-degree'' parameter $D$, 
 which represents the capability of the hardware to track parallel DRAM requests, 
 analogous to that B-tree takes a ``block size'' parameter that characterizes the granularity of each disk read by the hardware.
-Under the assumption that $D$ independent parallel DRAM requests, where each request only touches one cache line, can be completed in one roundtrip,
+Under the assumption that $D$ independent parallel DRAM requests where each request touches one cache line can be completed in one roundtrip,
 \MlpIndex takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
 and $O(D\cdot\log_D\log M)$ CPU work to execute an \insertion, \lookup or \lowerbound,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
-If we have SIMD support on $D$-vectorized operations, the CPU work could be reduced to $O(\log_D\log M)$ as well.
+If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and \simdgather/ \simdscatter operation), 
+the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
 To the best of our knowledge, \MlpIndex is practically the fastest ordered index. 
 It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
@@ -1226,14 +1230,17 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
             lcpNode = n;
         } 
     }
+    // The length of the string represented by lcpNode
+    int fullKeyLen = lcpNode->fullKey.length();
     // If the path-compression string does not fully match 
     // corresponding parts in x, then it's already over
     // and no need to recurse into child
-    if (x[0:lcpNode->fullKey.length()] != lcpNode->fullKey) {
+    if (x[0:fullKeyLen] != lcpNode->fullKey) {
         return lcpNode;
     }
-    // Recurse to find the LCP in the children of that node
-    return QueryLCP(lcpNode->children, x[start:start+step]);
+    // The LCP falls in range [fullKeyLen, fullKeyLen + step)
+    // Recurse to the child DS of that node to find it
+    return QueryLCP(lcpNode->children, x, fullKeyLen);
 }
 \end{minted}
 \end{codebox}\doublespacing
@@ -1295,7 +1302,7 @@ So we want a hash table that not only optimizes the average, but also the varian
 Cuckoo hashing \cite{cuckoohash} turns out to be the ideal choice that achieves both goals. 
 In cuckoo hashing, any existent key $x$ must exist in either position $f_1(x)$ 
 or position $f_2(x)$, where $f_1$ and $f_2$ are the two independent hash functions used for the hash table.
-This allows worst-case 2 lookups per query, and even better, all DRAM requests issued are independent. 
+This allows worst-case 2 DRAM accesses, and even better, all DRAM requests issued are independent. 
 
 The original cuckoo hashing scheme allows a maximum load factor of 50\%. 
 However one can improve to a load factor of 90\%+ with bucketized cuckoo \cite{bucketcuckoo}. 
@@ -1469,11 +1476,11 @@ We did not benchmark against comparison-based data structures such as the B-tree
 or Masstree \cite{masstree} (a B-tree/trie-tree hybrid data structure),
 since they are much slower on 64-bit keys than HOT and ART, as shown in both papers \cite{hot_sigmod18, arttrie_icde13}.
 Besides ordered index structures, we also benchmark our performance against hash table, which cannot support \lowerbound queries. 
-We included two hash table implementations, specifically, Google's dense\_hash\_set \cite{densehashset},
-which is a quadratic probing bucketized hash scheme widely used in industry, 
-and the cuckoo hash scheme that is used in \MlpIndex.
+The hash table library we used is Google's dense\_hash\_set \cite{densehashset},
+which is a quadratic probing bucketized hash scheme widely used in industry.
+The effective load factor of the dense\_hash\_set is 60\%.
 We also compare \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
-with its practical performance. Everything is single-threaded in the evaluation. 
+with its practical performance. Everything is single-threaded in the evaluation, and 1GB huge page is used. 
 Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
 
 We use a family of data distribution similar to the ones used in \cite{masstree}, which \cite{masstree} calls ``decimal distribution''. 
@@ -1500,7 +1507,7 @@ About 15\% of the \lowerbound query keys appeared in original data set, the rema
 
 In order to more accurately measure the time need to execute one operation, 
 we want to make sure that each query is indeed executed ``independently'', 
-so the total time over number of queries indeed reflects what it takes to execute one query. 
+so the total time over total number of queries indeed reflects what it takes to execute one query. 
 To see what it means, we will use the cuckoo hash table as an example. 
 Recall that each cuckoo hash lookup looks like this:
 
@@ -1536,7 +1543,7 @@ The solution is to use the same trick as in Section \ref{understandmlp}.
 We will hide the query text from compiler reordering and CPU out-of-order and speculative execution by 
 XORing it with the correct answer to the previous query. 
 Now the CPU cannot know what the next query is until it completes the execution of the previous one and yield the answer, 
-thus ``total time over number of query'' actually represents the time to execute one query. 
+thus ``total time over total number of query'' actually represents the time to execute one query. 
 This results in a code like this:
 
 \singlespacing\begin{codebox}
@@ -1560,15 +1567,158 @@ END_TIMING();
 \end{minted}
 \end{codebox}\doublespacing
 
-We note that this ``query encryption'' only make significant (2.5x) difference on hash table, mainly due to its extremely simple logic. 
+We note that this ``query encryption'' only make significant (1.5x to 2x) difference on hash table, mainly due to its extremely simple logic. 
 For ordered index, all benchmarked implementation, including \MlpIndex, becomes slower, but only by a small degree (less than 10\%). 
 This is as expected: since CPU speculative execution only have a small window, it is unsurprising that it 
 cannot penetrate complicated logic effectively. 
 
-The benchmark results can be found in Table \ref{mlpindex_results}.
+The benchmark results on data distribution $A$ and $B$ can be found in Figure \ref{mlpindex_distA} and \ref{mlpindex_distB} respectively.
+Raw numbers can be found in Table \ref{mlpindex_results}.
 
+As one can see, \MlpIndex, despite being an ordered index, has performance competitive with a well-engineered hash table.
+On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table to do an \insertion and \lookup. 
+On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
+But still, when compared with state-of-the-art ordered index structures, 
+on distribution $A$, we are more than 4x faster than HOT and ART on \insertion, 
+3.5x faster than HOT and 4.5x faster than ART on \lookup, 
+and more than 2x faster than HOT on \lowerbound. 
+On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 
+2.8x faster than HOT, 5.6x faster than ART on \lookup, 
+and 2x faster than HOT on \lowerbound.
+
+\begin{figure}[!htb]
+\centering
+  \includegraphics[width=0.8\linewidth]{mlpindex_result1.png}
+\caption{Data distribution A (80 million 64-bit keys). Comparison on time to execute one operation. 
+Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machine running the benchmark.}
+\label{mlpindex_distA}
+\end{figure}
+
+\begin{figure}[!htb]
+\centering
+  \includegraphics[width=0.8\linewidth]{mlpindex_result2.png}
+\caption{Data distribution B (80 million 64-bit keys). Comparison on time to execute one operation. 
+Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machine running the benchmark.}
+\label{mlpindex_distB}
+\end{figure}
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
+                                                                             & \insertion   & \lookup   & \lowerbound   & \insertion   & \lookup   & \lowerbound   \\ \hline
+Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
+\MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
+HOT                                                                          & 1.57         & 2.64      & 2.44          & 1.56         & 2.61      & 2.39          \\ \hline
+ART                                                                          & 1.65         & 2.00      & N/A           & 1.21         & 1.31      & N/A           \\ \hline
+std::set                                                                     & 0.71         & 0.67      & 0.67           & 0.73        & 0.67      & 0.67           \\ \hline
+\end{tabular}
+\caption{Raw throughput numbers in million operations per second.}
+\label{mlpindex_results}
+\end{table}
+
+\MlpIndex, from algorithm level, is not input-data dependent. 
+Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
+then additionally do hash table insertion for \insertion, or an additional hash table lookup for \lowerbound. 
+Why is it slower on Distribution $B$ than Distribution $A$? 
+We believe the most important reason is that Distribution $B$ has high-degree nodes at the bottom levels, 
+which makes the LCP likely to be found at deeper levels of the trie. 
+When we do the parallel hash table lookups, we checked the results in reverse order of depth, 
+so we can quit whenever a hit is found. 
+So on Distribution $A$ we are likely to exit earlier than Distribution $B$ when finding LCP, 
+resulting in an effectively smaller number of DRAM requests issued 
+(despite that all prefetches have been issued at the beginning, if a prefetched address is not actually used, 
+the latency of this prefetch is shadowed in the background because it does not affect the critical path), 
+making it faster.
+
+To better understand the performance, 
+we compare the ``theoretical'' performance derived from the models in Section \ref{understandmlp} against the real performance. 
+Note that in the ``theoretical'' model, 
+we treated all CPU work and cache-hitting DRAM accesses as free (or can be completely shadowed by cache misses) 
+and only consider the DRAM latency.
+
+Recall that for 64-bit keys, we make at most 13 independent DRAM accesses to perform a \QueryLCP operation. 
+Plugging in the empirical formula in Section \ref{mlpmeasurement}, it should take around $2.4$ DRAM roundtrip time.
+All a \lookup does is checking the result of \QueryLCP, so 2.4 is the ``theoretical cost'' for \lookup. 
+For \insertion, if there is no hash table movement due to conflict, we will only write addresses that are cache-resident, 
+which are also considered free in our model. 
+By collecting statastics, we observed that the average length of cuckoo replacement chain is around 0.5 per \insertion. 
+So \insertion should have a ``theoretical cost'' of 2.9.
+For \lowerbound, we always spend an additional DRAM request, 
+so it has a ``theoretical cost'' of 3.4. We compare the above theoretical cost with the practical time 
+on the two data distributions in Table \ref{mlpindex_theory_practice}.
+
+\begin{table}[]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+                             & Theory                      & Dist A                      & Dist B                      \\ \hline
+\lookup                      & 2.4                         & 1.58                        & 1.91                        \\ \hline
+\multirow{2}{*}{\insertion}  & 2.9                         & 2.10                        & 2.90                        \\ \cline{2-4} 
+                             & L+0.5                      & L+0.52                      & L+0.99                      \\ \hline
+\multirow{2}{*}{\lowerbound} & 3.4                         & 2.82                        & 3.05                        \\ \cline{2-4} 
+                             & \multicolumn{1}{c|}{L+1} & \multicolumn{1}{c|}{L+1.22} & \multicolumn{1}{c|}{L+1.14} \\ \hline
+\end{tabular}
+\caption{Theoretical (worst case spent in DRAM latency) and practical time for \MlpIndex to execute one operation, in DRAM roundtrip time.
+Insertion cost is amortized. $L$ represent the time for \lookup in respective column.}
+\label{mlpindex_theory_practice}
+\end{table}
+
+The ``base'' difference, i.e. the time needed to execute one \QueryLCP or one \lookup, 
+is already explained by differece in average depth of the LCP node, which varies according to data set. 
+So now we will focus on the delta between \insertion / \lowerbound operation and \lookup operation.
+
+In the theory model, \lowerbound should take 1 more DRAM roundtrip time than \lookup; 
+but in practice it takes around 1.2 more DRAM roundtrip time. 
+We believe the extra time is spent in finding the minimum child that is larger than the given one in the 256 fanouts of the LCP trie node. 
+We used multiple (cache-hitting) memory requests, SIMD operations and branches in the logic, 
+which, despite much faster than a cache miss, still requires non-negligible CPU time.
+
+\insertion involves non-negligible work to insert new nodes into hash table and update the extra-information fields along the path. 
+We note that the total number of nodes in the trie tree in distribution $A$ is smaller than that in distribution $B$, 
+since distribution $A$ has much more high degree nodes than distribution $B$ does.
+This results in less CPU work and less cuckoo hash displacements, which we believe is the reason that \insertion is faster on distribution $A$.
+
+\section{Future Works} \label{futureworks}
+
+In this section, we briefly mention a few possible directions of future works. 
+
+While our skiplist iterator works seamlessly for lock-free skiplist, 
+\MlpPQ and \MlpIndex are currently single-threaded only. 
+It would be interesting to support a multi-threaded version of \MlpPQ and \MlpIndex.
+What would be the best locking protocol for \MlpIndex? 
+Would it be fine-grained locking, read-optimized-write-exclusive locking, or even lock-free?
+How well would \MlpIndex perform in multi-threaded scenerio, 
+compared with other multi-threaded index structures, such as ROWEX ART \cite{art_sync}, Masstree \cite{masstree},
+lock-free skiplist \cite{lockfree_skiplist}, or Bw-Tree \cite{bwtree}?
+
+Currently we only support 64-bit keys for \MlpPQ and \MlpIndex. 
+So another direction of work is to support general string keys. 
+For \MlpIndex, we will eventually need more than 2 layers of data structures, 
+for sufficiently long key. But what length is the correct breaking point?
+What is the best ``query execution plan'' for each key length?
+For longer string keys, a lot of our sub-data-structures will only be managing a small set of keys. 
+What will be the best data structure to manage data of each magnitute? 
+How well would our data structure perform compared with HOT and ART, 
+as well as string-key-oriented data structure such as Masstree?
+Even more, would it be possible to combine string support and multi-threading support?
+Would it be possible to add transactional support or snapshotting and make it a 
+real-world database engine? 
+
+The developments in hardware is also posing new challenges to memory level parallelism, 
+for example, Intel is planning to publish the non-volatile DIMM memory in 2019.
+Persistable through power-offs and byte-addressable, 
+although each access has a much higher latency than current memory chips. 
+Would it be possible to develop data structures that leverages memory level parallelism 
+on those new hardwares to mitigate the high latency? 
 
 \section{Conclusion} \label{conclusion}
+
+In this paper, we demostrated that data structures that are designed to leverage high memory level parallelism 
+can achieve the performance not considered possible before, 
+typically a few times faster than the current state-of-the-arts. 
+
 
 \bibliography{ref}{}
 \bibliographystyle{plain}

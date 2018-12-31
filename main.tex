@@ -1576,10 +1576,10 @@ The benchmark results on data distribution $A$ and $B$ can be found in Figure \r
 Raw numbers can be found in Table \ref{mlpindex_results}.
 
 As one can see, \MlpIndex, despite being an ordered index, has performance competitive with a well-engineered hash table.
-On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table to do an \insertion and \lookup. 
+On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an \insertion and \lookup. 
 On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
 But still, when compared with state-of-the-art ordered index structures, 
-on distribution $A$, we are more than 4x faster than HOT and ART on \insertion, 
+on distribution $A$, we are 4.3x faster than HOT and ART on \insertion, 
 3.5x faster than HOT and 4.5x faster than ART on \lookup, 
 and more than 2x faster than HOT on \lowerbound. 
 On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 

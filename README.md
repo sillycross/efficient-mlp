@@ -3,7 +3,11 @@ on designing efficient data structures by leveraging memory level parallelism,
 a CPU hardware feature available on most of the modern CPUs manufactured after 2000.
 [pdf here](https://github.com/sillycross/efficient-mlp/blob/master/main.pdf)
 
-We present 3 novel data structures that achieves superior performance via clever use of memory level parallelism:
+In this report, we demostrated that by leveraging memory level parallelism, 
+one can design data structures that achieve the performance not considered possible before, 
+typically a few times faster than the current state-of-the-arts. 
+
+We present 3 novel "MLP-grounded" data structures:
 * A lock-free skiplist iterator
 * A priority queue
 * An ordered index

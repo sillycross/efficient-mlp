@@ -119,7 +119,7 @@
 
 \title{Efficient Data Structures via Memory Level Parallelism}
 \author{Haoran Xu}
-\date{}
+\date{6.UAP Project Report}
 
 \maketitle
 
@@ -1622,7 +1622,7 @@ std::set                                                                     & 0
 Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
 then additionally do hash table insertion for \insertion, or an additional hash table lookup for \lowerbound. 
 Why is it slower on Distribution $B$ than Distribution $A$? 
-We believe the most important reason is that Distribution $B$ has high-degree nodes at the bottom levels, 
+We believe the most important reason is that Distribution $A$ has high-degree nodes at the bottom levels, 
 which makes the LCP likely to be found at deeper levels of the trie. 
 When we do the parallel hash table lookups, we checked the results in reverse order of depth, 
 so we can quit whenever a hit is found. 

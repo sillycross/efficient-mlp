@@ -77,8 +77,7 @@
 \newlang{\verify}{Verify}
 \newlang{\sk}{sk}
 \newlang{\B}{B}
-\newlang{\MlpPQ}{MlpPQ\ }
-\newlang{\MlpIndex}{MlpIndex\ }
+\newlang{\MlpIndex}{MlpIndex}
 \newlang{\insertion}{insert}
 \newlang{\lookup}{lookup}
 \newlang{\lowerbound}{lower\_bound}
@@ -299,7 +298,8 @@ Compared with HOT \cite{hot_sigmod18}, the fastest state-of-the-art ordered inde
 we are 3 to 4 times faster on $\insertion$ and $\lookup$, and 2x faster on $\lowerbound$.
 We additionally note that our $\insertion$ and $\lookup$ performance is only slightly slower than a well-engineered hash table \cite{densehashset}, 
 which cannot support range queries like $\lowerbound$;
-and that our $\lowerbound$ performance is even better than EBS \cite{binary_search_layout}, 
+and that our $\lowerbound$ performance is even better than EBS \footnote{The authors did not name their algorithm officially.
+We will refer to this algorithm by EBS, since it employs \textbf{E}ytzinger layout and \textbf{B}-tree-like multi-way \textbf{S}earch.} \cite{binary_search_layout}, 
 an extensively optimized binary search algorithm on a static data set, which cannot support $\insertion$.
 %We also note that while most of the current state-of-the-arts ordered index are based on trie tree, 
 %which makes their performance inheritally dependent on the input data distribution, 
@@ -990,9 +990,9 @@ This allows one to directly locate a node that corresponds to a given prefix in 
 to that node from the root. This also allows $O(1)$ $\lookup$ 
 since a $\lookup$ is simply checking whether a leaf node exists in the hash table.
 
-The core operation of x-fast trie is \QueryLCP (LCP stands for longest common prefix): 
+The core operation of x-fast trie is $\QueryLCP$ (LCP stands for longest common prefix): 
 given a key $x$, find the length of the longest prefix of $x$, 
-such that the prefix corresponds to a node in the trie. The most naive way to support \QueryLCP is to just 
+such that the prefix corresponds to a node in the trie. The most naive way to support $\QueryLCP$ is to just 
 start from the root and move down according to the bits of $x$. When a child does not exist, 
 the height of the current node is the desired result. This takes $O(\log M)$ per query.
 
@@ -1002,7 +1002,7 @@ then every prefix of length $0\leq i\leq k$ exists, but any prefix of length $i>
 So we can binary search on that length and query the hash table to know if a prefix exists in $O(1)$. 
 This reduces the time complexity to $O(\log\log M)$. 
 
-We can support $\lowerbound$ in $O(\log\log M)$ based on \QueryLCP. 
+We can support $\lowerbound$ in $O(\log\log M)$ based on $\QueryLCP$. 
 Suppose the LCP has length $k$ bits and the node of LCP is $n$. 
 Since $n$ is the LCP, $n$ must not have child $x[k]$, as otherwise there will be a longer common prefix. 
 However, $n$ must have child $1-x[k]$, since $n$ is the prefix of some key in the trie. 
@@ -1073,7 +1073,7 @@ bool Insert(Key x) {
 In this section, we present the two core ideas that build up the theoretical aspect of \MlpIndex:
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
-\item Use $D$-ary search to replace binary search in \QueryLCP for high memory level parallelism.
+\item Use $D$-ary search to replace binary search in $\QueryLCP$ for high memory level parallelism.
 This reduces the DRAM roundtrips required per $\lookup$ and $\lowerbound$ query from $O(\log\log M)$ to $O(\log_D\log M)$, 
 with $D$ parallel requests sent in each roundtrip.
 \item Support path compression (also known as ``Patricia'' \cite{patricia}) for lower insertion cost and memory consumption. 
@@ -1264,7 +1264,7 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
 \end{minted}
 \end{codebox}\doublespacing
 
-$\lookup$ operation can be built directly upon \QueryLCP, 
+$\lookup$ operation can be built directly upon $\QueryLCP$, 
 since all we need to check is whether n\verb|->|fullKey is exactly the key we are looking for, 
 where n is the LCP node.
 However, note that it is incorrect to simply query if $x$ exists in root\verb|->|hashTable, 
@@ -1281,7 +1281,7 @@ bool Lookup(Node* root, Key x) {
 \end{minted}
 \end{codebox}\doublespacing
 
-$\lowerbound$ operation can also be supported in $O(\log_D\log M)$ by \QueryLCP and the extra information 
+$\lowerbound$ operation can also be supported in $O(\log_D\log M)$ by $\QueryLCP$ and the extra information 
 carried on the node, using identical idea as the original x-fast trie. 
 There are only two complications compared with the original x-fast trie: 
 first, we need to handle the case that the path-compression string does not match; 
@@ -1525,7 +1525,7 @@ It would additionally save some space, as well as DRAM accesses, to simply store
 in a flat array, each using a bitmap of 256 bits (32 bytes) to store which children exists. 
 This results in a bitmap of $256^2\times 32$ bytes ($2MB$), instead of the hash table. 
 After this optimization, we only need to access 6 layers times 2 (per cuckoo lookup) plus 1 (the top-layers bitmap), 
-which is 13 DRAM positions in parallel, to execute a \QueryLCP for 64-bit keys, 
+which is 13 DRAM positions in parallel, to execute a $\QueryLCP$ for 64-bit keys, 
 which is another small performance and memory-consumption improvement.
  
 \subsubsection*{The Choice of Hash Function}
@@ -1558,7 +1558,7 @@ We used Google's dense\_hash\_set \cite{densehashset},
 a quadratic probing hash table scheme widely used in industry.
 The effective load factor of the dense\_hash\_set is 60\%, 
 though the performance is almost the same with a effective load factor of 30\%.
-\item \textit{EBS} \cite{binary_search_layout}: short for ``Binary Search on Eytzinger-layout static array''. 
+\item \textit{EBS} \cite{binary_search_layout}: short for ``B-tree-like multi-way Search on Eytzinger-layout static array''. 
 As the name suggests, it is a carefully engineered binary search on a static data set, 
 so it supports $\lowerbound$ but not $\insertion$.
 The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
@@ -1764,9 +1764,9 @@ Note that in the ``theoretical'' model,
 we treated all CPU work and cache-hitting DRAM accesses as free (or can be completely shadowed by cache misses) 
 and only consider the DRAM latency.
 
-Recall that for 64-bit keys, we make at most 13 independent DRAM accesses to perform a \QueryLCP operation. 
+Recall that for 64-bit keys, we make at most 13 independent DRAM accesses to perform a $\QueryLCP$ operation. 
 Plugging in the empirical formula in Section \ref{mlpmeasurement}, it should take around $2.4$ DRAM roundtrip time.
-All a $\lookup$ does is checking the result of \QueryLCP, so 2.4 is the ``theoretical cost'' for $\lookup$. 
+All a $\lookup$ does is checking the result of $\QueryLCP$, so 2.4 is the ``theoretical cost'' for $\lookup$. 
 For $\insertion$, if there is no hash table movement due to conflict, we will only write addresses that are cache-resident, 
 which are also considered free in our model. 
 By collecting statastics, we observed that the average length of cuckoo replacement chain is around 0.5 per $\insertion$. 
@@ -1791,7 +1791,7 @@ Insertion cost is amortized. $L$ represent the time for $\lookup$ in respective 
 \label{mlpindex_theory_practice}
 \end{table}
 
-The ``base'' difference, i.e. the time needed to execute one \QueryLCP or one $\lookup$, 
+The ``base'' difference, i.e. the time needed to execute one $\QueryLCP$ or one $\lookup$, 
 is already explained by differece in average depth of the LCP node, which varies according to data set. 
 So now we will focus on the delta between $\insertion$ / $\lowerbound$ operation and $\lookup$ operation.
 
@@ -1811,7 +1811,7 @@ This results in less CPU work and less cuckoo hash displacements, which we belie
 \begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
 \multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
-                                                                             & $\insertion$   & $\lookup$   & $\lowerbound$   & $\insertion$   & $\lookup$   & $\lowerbound$   \\ \hline
+                                                                             & \ $\insertion\ $   & \ $\lookup\ $   & $\lowerbound$   & \ $\insertion\ $   & \ $\lookup\ $   & $\lowerbound$   \\ \hline
 Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
 EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
 \MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
@@ -1866,6 +1866,8 @@ typically a few times faster than the current state-of-the-arts.
 
 I am grateful to my mentor Vladimir Kiriansky for his extensive help and discussions throughout the research 
 and the writing of this paper. Thanks Saman Amarasinghe, Martin Rinard for the review and advice on writing the paper. 
+Thanks MemSQL Inc. for providing the opportunity to evaluate my skiplist iterator in a real database, 
+as well as their CTO Drew Paroski, for the permission to release my findings to public.
 
 \bibliography{ref}{}
 \bibliographystyle{plain}

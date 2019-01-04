@@ -1,5 +1,4 @@
 \documentclass[11pt, usletter]{article}
-\usepackage{CJKutf8}
 \usepackage{amsthm}
 \usepackage{extarrows}
 \usepackage{ulem}
@@ -47,9 +46,6 @@
 \usepackage{minted}
 \usepackage{mdframed}
 
-\usepackage{setspace}
-\doublespacing
-
 \newlang{\MAX}{MAX}
 \newlang{\enc}{Enc}
 \newlang{\dec}{Dec}
@@ -83,14 +79,14 @@
 \newlang{\B}{B}
 \newlang{\MlpPQ}{MlpPQ\ }
 \newlang{\MlpIndex}{MlpIndex\ }
-\newlang{\insertion}{insert\ }
-\newlang{\lookup}{lookup\ }
-\newlang{\lowerbound}{lower\_bound\ }
-\newlang{\upperbound}{upper\_bound\ }
-\newlang{\simdgather}{gather\ }
-\newlang{\simdscatter}{scatter\ }
-\newlang{\Cimple}{Cimple\ }
-\newlang{\QueryLCP}{QueryLCP\ }
+\newlang{\insertion}{insert}
+\newlang{\lookup}{lookup}
+\newlang{\lowerbound}{lower\_bound}
+\newlang{\upperbound}{upper\_bound}
+\newlang{\simdgather}{gather}
+\newlang{\simdscatter}{scatter}
+\newlang{\Cimple}{Cimple}
+\newlang{\QueryLCP}{QueryLCP}
 \DeclareMathOperator{\rin}{\in_{_{\textrm{R}}}}
 \DeclareMathOperator{\supp}{Supp}
 \DeclareMathOperator{\range}{range}
@@ -113,15 +109,35 @@
   skipbelow=\topsep,
 ]{codebox}
 
+\usepackage{setspace}
+\doublespacing
+
 \bibdata{ref.bib}
 
 \begin{document}
 
 \title{Efficient Data Structures via Memory Level Parallelism}
 \author{Haoran Xu}
-\date{6.UAP Project Report}
+\date{}
 
 \maketitle
+
+\begin{center}
+
+\
+
+6.UAP Project Report
+
+\
+
+Supervisors: 
+Vladimir Kiriansky,
+Saman Amarasinghe, 
+Martin Rinard
+
+\end{center}
+
+\newpage
 
 \tableofcontents
 
@@ -217,11 +233,11 @@ often requires significant labor work, as well as extensive change to the applic
 yet the resulted code is almost always tricky, error-prone, unreadable and unmaintainable -- 
 the exact opposite to the standards of high quality industrial code. 
 \cite{cimple_pact18} addressed this issue by
-designing a Domain Specific Language called \Cimple that generates and manages software pipeline automatically from C-like code
+designing a Domain Specific Language called $\Cimple$ that generates and manages software pipeline automatically from C-like code
 via a coroutine technique. 
-In \Cimple, all one needs to do is to annotate
+In $\Cimple$, all one needs to do is to annotate
 DRAM accesses in the code that are supposed to be cache-missing.
-The authors demostrated that the automatically generated software pipelines via \Cimple have comparable performance as the hand-written ones, 
+The authors demostrated that the automatically generated software pipelines via $\Cimple$ have comparable performance as the hand-written ones, 
 on a variety of well-known data structures.
 
 However, there is one fundamental limitation of software pipelining technique. 
@@ -266,29 +282,29 @@ while the algorithm being conceptually much easier to understand.
 
 The rest of the paper is organized as follows. 
 In Section \ref{understandmlp}, we measure the effect of memory level parallelism on a set of real-world CPUs, 
-In Section \ref{sliter}, \ref{priorityqueue}, \ref{orderedindex}, 
-we provide 3 examples of our ``MLP-grounded'' data structures -- a lock-free skiplist iterator, 
-a priority queue, and an ordered index. All of our data structures have identical APIs as their traditional counterparts.
+In Section \ref{sliter}, \ref{orderedindex}, 
+we provide two examples of our ``MLP-grounded'' data structures -- a lock-free skiplist iterator and an ordered index. 
+They both have identical APIs as their traditional counterparts.
 In Section \ref{sliter}, we present how to speed up lock-free skiplist iteration via memory level parallelism. 
 We employed our technique in MemSQL \cite{memsql},
 a commercial main-memory database that uses lock-free skiplist \cite{lockfree_skiplist} as their index data structure \cite{memsqladamblog}, 
 and demostrated that our technique achieves up to 1.9x single-threaded end-to-end query time speedup, and 1.5x to 1.9x
 total throughput when running on all cores.
-In Section \ref{priorityqueue}, we present a priority queue based on the binary heap, 
-but redesigned to allow internal parallelism. We demostrate that it is [todo] faster than the stl implementation 
-[todo: comparing against stl is stupid]. 
-Finally in Section \ref{orderedindex}, we present \MlpIndex, an ordered index for 64-bit integers 
+In Section \ref{orderedindex}, we present \MlpIndex, an ordered index for 64-bit integers 
 (and can be extended to support short strings), 
-inspired by X-fast trie \cite{xfast}, but re-designed from ground up to leverage memory level parallelism. 
-We demostrate that it can execute an \insertion or \lookup operation in time equivalent to around 2 DRAM roundtrips, 
-and an \lowerbound operation in time equivalent to around 3 DRAM roundtrips. 
-This is 3 to 4 times faster than HOT \cite{hot_sigmod18}, the current state-of-the-art ordered index structures. 
-We note that our \insertion and \lookup performance is only slightly slower than a hash table, 
-which cannot support range queries like \lowerbound.
-We also note that while most of the current state-of-the-arts ordered index are based on trie tree, 
-which makes their performance inheritally dependent on the input data distribution, 
-the nature of our approach makes its performance independent of the input data, 
-and we are still 2 to 3 times faster even if comparing our worst case against the best case of our benchmark rivals.
+inspired by x-fast trie \cite{xfast}, but re-designed from ground up to leverage memory level parallelism. 
+We demostrate that it can execute an $\insertion$ or $\lookup$ operation in time equivalent to around 2 DRAM roundtrips, 
+and an $\lowerbound$ operation in time equivalent to around 3 DRAM roundtrips. 
+Compared with HOT \cite{hot_sigmod18}, the fastest state-of-the-art ordered index structure to the best of our knowledge, 
+we are 3 to 4 times faster on $\insertion$ and $\lookup$, and 2x faster on $\lowerbound$.
+We additionally note that our $\insertion$ and $\lookup$ performance is only slightly slower than a well-engineered hash table \cite{densehashset}, 
+which cannot support range queries like $\lowerbound$;
+and that our $\lowerbound$ performance is even better than EBS \cite{binary_search_layout}, 
+an extensively optimized binary search algorithm on a static data set, which cannot support $\insertion$.
+%We also note that while most of the current state-of-the-arts ordered index are based on trie tree, 
+%which makes their performance inheritally dependent on the input data distribution, 
+%the nature of our approach makes its performance independent of the input data, 
+%and we are still 2 to 3 times faster even if comparing our worst case against the best case of our benchmark rivals.
 In Section \ref{futureworks} and \ref{conclusion}, we conclude this paper with a few directions of possible future works.
 
 \section{Understanding MLP in Real World} \label{understandmlp}
@@ -583,7 +599,7 @@ This results in a so-called skiplist tower, as shown in Figure \ref{skiplist_tow
 Since each layer is a sampling of its next layer with probability $1/2$, 
 there are $O(\log n)$ layers in expectation for a skiplist containing $n$ items, 
 and there are expected $O(1)$ items in the next layer between two adjacent nodes of any layer. 
-This allows one to answer a \lowerbound query in expected $O(\log n)$ time by traversing from the start of top layer, 
+This allows one to answer a $\lowerbound$ query in expected $O(\log n)$ time by traversing from the start of top layer, 
 moving along the linked list as long as the next node is smaller than the given bound, 
 and moving down to the next layer when the condition is not satisfied. 
 After the two boundary nodes corresponding to the specifed range are found, 
@@ -769,7 +785,7 @@ and for the last few phases we may prefetch items that are outside range),
 for short iterations our advantage is smaller. 
 However, we are advantagous as long as the range contains at least around 20 items.
 
-\subsection{Integration into MemSQL, a Real World Database} \label{sliter_memsql}
+\subsection{Evaluation in MemSQL, a Real World Database} \label{sliter_memsql}
 
 In this section, we demostrate the performance impact of our iterator in MemSQL \cite{memsql}, 
 a commercial main memory database.
@@ -845,13 +861,11 @@ Those barriers could require flushing the CPU load/store queues, which limits th
 Finally, MemSQL did not use huge pages. 
 As shown in Section \ref{misctricks}, this has a negative impact on the performance of memory level parallelism.
 
-\section{Priority Queue} \label{priorityqueue}
-
 \section{Ordered Index} \label{orderedindex}
 
 In this section, we present \MlpIndex, an ordered index structure that supports identical APIs as std::set.
-Specifically, it supports \insertion (insert an element into the set), \lookup (query if an element exists in the set) 
-and \lowerbound (find the minimum element in the set no smaller than the given element).
+Specifically, it supports $\insertion$ (insert an element into the set), $\lookup$ (query if an element exists in the set) 
+and $\lowerbound$ (find the minimum element in the set no smaller than the given element).
 \MlpIndex is not a comparison-based data structure, but an integer data structure that operates on a key universe $[0,M)$.
 While our implementation currently only supports 64-bit keys ($M=2^{64}$), it could be extended to support any string keys as well.
 
@@ -860,9 +874,9 @@ which represents the capability of the hardware to track parallel DRAM requests,
 analogous to that B-tree takes a ``block size'' parameter that characterizes the granularity of each disk read by the hardware.
 Under the assumption that $D$ independent parallel DRAM requests where each request touches one cache line can be completed in one roundtrip,
 \MlpIndex takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
-and $O(D\cdot\log_D\log M)$ CPU work to execute an \insertion, \lookup or \lowerbound,
+and $O(D\cdot\log_D\log M)$ CPU work to execute an $\insertion$, $\lookup$ or $\lowerbound$,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
-If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and \simdgather/ \simdscatter operation), 
+If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and $\simdgather$/ $\simdscatter$ operation), 
 the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
 To the best of our knowledge, \MlpIndex is practically the fastest ordered index. 
@@ -870,7 +884,7 @@ It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18},
 the state-of-the-art index published in 2018, on all operations,
 and about 4.5x faster than Adaptively Radix Tree (ART) \cite{arttrie_icde13}. 
 On a data set of 80 million 64-bit keys, single-threaded \MlpIndex only takes around 2 DRAM roundtrip time to perform 
-an \insertion or \lookup, and around 3 DRAM roundtrip time to perform an \lowerbound.
+an $\insertion$ or $\lookup$, and around 3 DRAM roundtrip time to perform an $\lowerbound$.
 We note that since the data set cannot fit into cache, 
 it is impossible for any algorithm to support the operations in less than the time of 1 DRAM roundtrip.
 Our superior speed 
@@ -880,34 +894,34 @@ and adaptively choosing different data structures for high-degree and low-degree
 to minimize the constants hidden in the algorithm.
 For 64-bit keys, our algorithm only makes 6 parallel hash table lookups, 
 which boil down to at most 12 independent parallel DRAM accesses in our implementation,
-to execute a \lookup query. \lowerbound requires only one additional DRAM access
+to execute a $\lookup$ query. $\lowerbound$ requires only one additional DRAM access
 depending on the lookup results. 
-\insertion only writes to cache-resident addresses after the lookup 
+$\insertion$ only writes to cache-resident addresses after the lookup 
 if there is no hash table movement due to conflict.
 
 \MlpIndex is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
-$O(\log \log M)$ per operation is the lower bound in time to support both \insertion and \lowerbound operation. 
+$O(\log \log M)$ per operation is the lower bound in time to support both $\insertion$ and $\lowerbound$ operation. 
 
-For use cases that requires both \lookup and \lowerbound, 
-a common strategy is to build a stand-alone hash table to support $O(1)$ \lookup, 
-in addition to the ordered index that supports \lowerbound, 
-since the native \lookup operation in ordered index can be much slower than a hash table.
+For use cases that requires both $\lookup$ and $\lowerbound$, 
+a common strategy is to build a stand-alone hash table to support $O(1)$ $\lookup$, 
+in addition to the ordered index that supports $\lowerbound$, 
+since the native $\lookup$ operation in ordered index can be much slower than a hash table.
 This strategy is applied in industrial in-memory storage engines like Redis \cite{redis}.
-However, it is unnecessary for us to build the stand-alone hash table at the cost of slower \insertion and extra memory, 
-because in practice our native $O(\log_D\log M)$ \lookup is already almost as fast as a carefully-engineered hash table could do, 
+However, it is unnecessary for us to build the stand-alone hash table at the cost of slower $\insertion$ and extra memory, 
+because in practice our native $O(\log_D\log M)$ $\lookup$ is already almost as fast as a carefully-engineered hash table could do, 
 as shown in Section \ref{mlpindex_eval}.
 
 The core idea of \MlpIndex is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
-X-fast trie supports $O(\log M)$ \insertion and $O(\log\log M)$ \lowerbound, while using $O(n\log M)$ memory.
-While its \lowerbound performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
+X-fast trie supports $O(\log M)$ $\insertion$ and $O(\log\log M)$ $\lowerbound$, while using $O(n\log M)$ memory.
+While its $\lowerbound$ performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
 its huge constants hidden in the algorithm as well as huge memory consumption made it not considered useful in practice. 
 Indeed, the algorithm proposed in the original paper requires 64 hash table nodes to store a 64-bit key, 
 and each hash table node needs to store the information of 4 pointers and 5 keys. 
 That's already 4.5KB in space (550x larger than the original key size), 
 and we haven't even considered the load factor of the hash table yet. 
 While the authors proposed y-fast trie, 
-an improvement over x-fast trie that improved the \insertion performance to $O(\log\log M)$ and space consumption to $O(n)$, 
+an improvement over x-fast trie that improved the $\insertion$ performance to $O(\log\log M)$ and space consumption to $O(n)$, 
 the improvement is mainly theoretical and introduces even larger constants hidden in the big-O notation. 
 We are not aware of any attempts to implement x-fast trie or y-fast trie as a practically usable data structure. 
 
@@ -973,8 +987,8 @@ if (n->IsLeaf) {
 
 Furthermore, all the trie nodes are put into a hash table, indexed by the ``Prefix'' field of the node. 
 This allows one to directly locate a node that corresponds to a given prefix in $O(1)$, without the need to walk through the path 
-to that node from the root. This also allows $O(1)$ \lookup 
-since a \lookup is simply checking whether a leaf node exists in the hash table.
+to that node from the root. This also allows $O(1)$ $\lookup$ 
+since a $\lookup$ is simply checking whether a leaf node exists in the hash table.
 
 The core operation of x-fast trie is \QueryLCP (LCP stands for longest common prefix): 
 given a key $x$, find the length of the longest prefix of $x$, 
@@ -988,7 +1002,7 @@ then every prefix of length $0\leq i\leq k$ exists, but any prefix of length $i>
 So we can binary search on that length and query the hash table to know if a prefix exists in $O(1)$. 
 This reduces the time complexity to $O(\log\log M)$. 
 
-We can support \lowerbound in $O(\log\log M)$ based on \QueryLCP. 
+We can support $\lowerbound$ in $O(\log\log M)$ based on \QueryLCP. 
 Suppose the LCP has length $k$ bits and the node of LCP is $n$. 
 Since $n$ is the LCP, $n$ must not have child $x[k]$, as otherwise there will be a longer common prefix. 
 However, $n$ must have child $1-x[k]$, since $n$ is the prefix of some key in the trie. 
@@ -1017,7 +1031,7 @@ Node* Lower_Bound(Key x) {
 \end{minted}
 \end{codebox}\doublespacing
 
-Performing an \insertion operation is very similar. 
+Performing an $\insertion$ operation is very similar. 
 After finding the LCP node $n$, one just needs to build a path of new nodes to the leaf from $n$, 
 and update the extra-information fields of all the nodes from the root to the newly inserted leaf,
 which takes $O(\log M)$:
@@ -1060,10 +1074,10 @@ In this section, we present the two core ideas that build up the theoretical asp
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
 \item Use $D$-ary search to replace binary search in \QueryLCP for high memory level parallelism.
-This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log\log M)$ to $O(\log_D\log M)$, 
+This reduces the DRAM roundtrips required per $\lookup$ and $\lowerbound$ query from $O(\log\log M)$ to $O(\log_D\log M)$, 
 with $D$ parallel requests sent in each roundtrip.
 \item Support path compression (also known as ``Patricia'' \cite{patricia}) for lower insertion cost and memory consumption. 
-This reduces \insertion cost from $O(\log M)$ to $O(\log_D\log M)$ DRAM roundtrips and $O(D\cdot \log_D\log M)$ CPU work, 
+This reduces $\insertion$ cost from $O(\log M)$ to $O(\log_D\log M)$ DRAM roundtrips and $O(D\cdot \log_D\log M)$ CPU work, 
 and reduces memory consumption of the data structure from $O(n\cdot\log M)$ to $O(n\cdot\log_D\log M)$.
 \end{itemize}
 
@@ -1078,7 +1092,7 @@ We split the current interval $[l,r]$ into $D$ parts,
 and query length $l+(r-l)/D$, $l+(r-l)/D*2$, $\cdots$, $l+(r-l)/D*(D-1)$.
 The DRAM accesses from those hash table queries are independent and can be executed in parallel.
 We can then narrow down to an interval that is $1/D$ size of the original.
-This reduces the DRAM roundtrips required per \lookup and \lowerbound query from $O(\log_2\log M)$ to $O(\log_D\log M)$.
+This reduces the DRAM roundtrips required per $\lookup$ and $\lowerbound$ query from $O(\log_2\log M)$ to $O(\log_D\log M)$.
 
 \subsubsection*{Supporting path compression}
 
@@ -1250,7 +1264,7 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
 \end{minted}
 \end{codebox}\doublespacing
 
-\lookup operation can be built directly upon \QueryLCP, 
+$\lookup$ operation can be built directly upon \QueryLCP, 
 since all we need to check is whether n\verb|->|fullKey is exactly the key we are looking for, 
 where n is the LCP node.
 However, note that it is incorrect to simply query if $x$ exists in root\verb|->|hashTable, 
@@ -1267,16 +1281,16 @@ bool Lookup(Node* root, Key x) {
 \end{minted}
 \end{codebox}\doublespacing
 
-\lowerbound operation can also be supported in $O(\log_D\log M)$ by \QueryLCP and the extra information 
+$\lowerbound$ operation can also be supported in $O(\log_D\log M)$ by \QueryLCP and the extra information 
 carried on the node, using identical idea as the original x-fast trie. 
 There are only two complications compared with the original x-fast trie: 
 first, we need to handle the case that the path-compression string does not match; 
 second, that the children of a node is managed by a recursive data structure, 
-so we need to find the \lowerbound of the LCP string first, 
+so we need to find the $\lowerbound$ of the LCP string first, 
 by finding the lower bound among the children if possible, 
 and going upward to the parent data structure if the lower bound does not exist in children.
-After we find the \lowerbound of the LCP string, 
-the real \lowerbound is the smallest string starting with the LCP string, 
+After we find the $\lowerbound$ of the LCP string, 
+the real $\lowerbound$ is the smallest string starting with the LCP string, 
 which can also be found by going upward the parent data structure.
 The pseudocode can be found below:
 
@@ -1390,12 +1404,12 @@ so we effectively reduced the time by a factor of two for 64-bit case.
 
 After applying this optimization, the \MlpIndex structure for 64-bit keys is effectively 
 a path-compressed trie tree of fanout 256, with a 256-bit-long bitmap in each node to denote whether a child exists. 
-To find the \lowerbound of a given key $x$, we first find the LCP node $n$ and LCP length $k$ (in bytes) in the trie 
+To find the $\lowerbound$ of a given key $x$, we first find the LCP node $n$ and LCP length $k$ (in bytes) in the trie 
 by lookup the 8 prefixes of $x$ in the hash tables. 
 Then, we find the lower bound of $x[k]$ amongst the children of $n$ in the bitmap. 
 If the lower bound exists, the answer is just the minimum element stored in the corresponding subtree.
 If not, we may move back to the parent of $n$ and repeat. 
-This allows us to remove the leaf-links (as well as ``max'' field if one does not need to support \upperbound) to save more memory. 
+This allows us to remove the leaf-links (as well as ``max'' field if one does not need to support $\upperbound$) to save more memory. 
 And actually we did not sacrifice performance, since moving along the leaf-link results in a costy cache miss, 
 but the above algorithm operates on cache-resident data all the time, and most of the time in practice 
 we don't have to move along the parent path for more than a few steps.
@@ -1539,18 +1553,18 @@ it demostrates the cost we took to support all operations simutanuously.
 The details of our benchmark rivals can be find below:
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
-\item \textit{HashTable}: a hash table supports \insertion and \lookup in $O(1)$ expected time, but cannot support \lowerbound queries.
+\item \textit{HashTable}: a hash table supports $\insertion$ and $\lookup$ in $O(1)$ expected time, but cannot support $\lowerbound$ queries.
 We used Google's dense\_hash\_set \cite{densehashset},
 a quadratic probing hash table scheme widely used in industry.
 The effective load factor of the dense\_hash\_set is 60\%, 
 though the performance is almost the same with a effective load factor of 30\%.
 \item \textit{EBS} \cite{binary_search_layout}: short for ``Binary Search on Eytzinger-layout static array''. 
 As the name suggests, it is a carefully engineered binary search on a static data set, 
-so it supports \lowerbound but not \insertion.
+so it supports $\lowerbound$ but not $\insertion$.
 The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
 amongst a variety of binary search algorithm variants they investigated. 
-We used the variant that is emperically fastest on our machine, which is ``the 16-way implicit B-tree Eytzinger layout
-along with low-level optimizations such as conditional moves''
+We used the variant that is emperically fastest on our machine, which uses 16-way implicit B-tree layout + Eytzinger layout
++ ``low-level optimizations such as unrolling and conditional moves''
 (the ``btree16\_a'' variant in authors' benchmark).
 \item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
 We use the public-available implementation released along with the original paper.
@@ -1560,10 +1574,10 @@ because we are using a larger data set, and our CPU frequency is slower than the
 \item \textit{ART} \cite{arttrie_icde13}: this was the fastest ordered index structure we are aware of, before HOT was published.
 We use the public-available implementation released along with the original paper.
 It is a single-file library so there is no potential configuration issue.
-We note that while ART could support \lowerbound queries, 
+We note that while ART could support $\lowerbound$ queries, 
 the public-available implementation only supports prefix-search, 
-which is more restrictive than general \lowerbound. 
-As such we are unable to test the \lowerbound performance for ART.
+which is more restrictive than general $\lowerbound$. 
+As such we are unable to test the $\lowerbound$ performance for ART.
 \end{itemize}
 
 We did not benchmark against comparison-based data structures such as the B-tree variants 
@@ -1595,11 +1609,11 @@ Distribution $B$ is mirror to $A$: the first 2 bytes have a large candidate set 
 while the last 6 bytes have a small candidate set of 6 elements for each byte.
 Both data set contains 80 million elements.
 
-\lookup queries are generated as a mix of keys sampled directly from the data set (so the \lookup must yield positive result),
+$\lookup$ queries are generated as a mix of keys sampled directly from the data set (so the $\lookup$ must yield positive result),
 and keys sampled from the same distribution that generated the data set (so it exists in the original data set 
-with only a small probability). The final positive rate for \lookup is controlled to be around 80\%. 
-Keys for \lowerbound queries are generated using the same distribution as the original data set is generated. 
-About 15\% of the \lowerbound query keys appeared in original data set, the remaining 85\% do not. 
+with only a small probability). The final positive rate for $\lookup$ is controlled to be around 80\%. 
+Keys for $\lowerbound$ queries are generated using the same distribution as the original data set is generated. 
+About 15\% of the $\lowerbound$ query keys appeared in original data set, the remaining 85\% do not. 
 
 In order to more accurately measure the time need to execute one operation, 
 we want to make sure that each query is indeed executed ``independently'', 
@@ -1690,18 +1704,18 @@ Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machin
 \end{figure}
 
 As one can see, \MlpIndex, despite being an ordered index, 
-has a performance competitive with a well-engineered hash table on \insertion and \lookup, 
-and its \lowerbound performance is even better than EBS, 
-the extensively optimized static-data-set binary search designed to specialize at \lowerbound.
-On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an \insertion and \lookup. 
+has a performance competitive with a well-engineered hash table on $\insertion$ and $\lookup$, 
+and its $\lowerbound$ performance is even better than EBS, 
+the extensively optimized static-data-set binary search designed to specialize at $\lowerbound$.
+On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an $\insertion$ and $\lookup$. 
 On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
 But still, when compared with state-of-the-art ordered index structures, 
-on distribution $A$, we are 4.3x faster than HOT and ART on \insertion, 
-3.5x faster than HOT and 4.5x faster than ART on \lookup, 
-and more than 2x faster than HOT on \lowerbound. 
-On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 
-2.8x faster than HOT, 5.6x faster than ART on \lookup, 
-and 2x faster than HOT on \lowerbound.
+on distribution $A$, we are 4.3x faster than HOT and ART on $\insertion$, 
+3.5x faster than HOT and 4.5x faster than ART on $\lookup$, 
+and more than 2x faster than HOT on $\lowerbound$. 
+On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on $\insertion$, 
+2.8x faster than HOT, 5.6x faster than ART on $\lookup$, 
+and 2x faster than HOT on $\lowerbound$.
 
 The comparison between \MlpIndex and EBS is especially interesting. 
 It may look surprising at first glance: how could it be possible for one to support fast insertions, 
@@ -1711,11 +1725,11 @@ to optimize the cache efficiency, as well as used a B-tree-like structure to dec
 The key comes in two points. First, we are an integer data structure, while EBS is a comparison-based data structure. 
 This allows us to achieve theoretically better complexity, specifically, $O(\log\log M)$ verus $O(\log n)$. 
 Second, our design allows us to effectively leverage MLP to further shorten the DRAM dependency chain, 
-while EBS, essentially a carefully-layouted B-tree, can only move down level by level, 
-resulting in a longer DRAM dependency chain than us. 
-Prefetching cannot help EBS either.
-Although it is a static B-tree, so we can know the address of the children nodes without having 
-the parent node fetched into memory, the best we can do is to prefetch all the $B$ children of a B-tree node, 
+while EBS, essentially a carefully-layouted B-tree, cannot effectively leverage MLP. 
+All it can do is move down the tree level by level, resulting in a longer DRAM dependency chain than us. 
+Despite that the static tree layout allows one to know the address of the children nodes without having 
+the parent node fetched into memory, 
+the best one can do to ``look-ahead'' one level is still to prefetch all the $B$ children of a B-tree node, 
 which turns out to be too costy. Indeed, the experiments in the authors' repository 
 showed that prefetching only slow things down for all ``B-tree Eytzinger'' category algorithms.
 But why is the performance difference between \MlpIndex and EBS not so large? 
@@ -1723,12 +1737,16 @@ The main reason is, EBS has an important advantage that we don't: it can leverag
 Specifically, the top of its B-tree will be cache-resident, 
 so despite that it has a longer DRAM dependency chain, many accesses at the beginning of the chain will hit L1/L2/L3 
 cache, making them cheaper (to a varied degree) than a real DRAM access. 
-However, this is not the case for us. We issue $D$ independent accesses in a batch, 
+However, this is not the case for us. We issue $D$ independent accesses in parallel, 
 and clearly not all of them are cache resident, so cache effect has little help for us.
+However, we note that since the cache has a fixed size, we would have larger advantage on larger data sets; 
+and while in benchmark one can exclusively own all the caches, it is impractical to assume so in real world settings,
+as all the other components in a real application will use cache space as well. 
+So the fact that our performance does not rely much on L2/L3 cache is actually an advantage in real world.
 
 \MlpIndex, from algorithm level, is not input-data dependent. 
 Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
-then additionally do hash table insertion for \insertion, or an additional hash table lookup for \lowerbound. 
+then additionally do hash table insertion for $\insertion$, or an additional hash table lookup for $\lowerbound$. 
 Why is it slower on Distribution $B$ than Distribution $A$? 
 We believe the most important reason is that Distribution $A$ has high-degree nodes at the bottom levels, 
 which makes the LCP likely to be found at deeper levels of the trie. 
@@ -1748,12 +1766,12 @@ and only consider the DRAM latency.
 
 Recall that for 64-bit keys, we make at most 13 independent DRAM accesses to perform a \QueryLCP operation. 
 Plugging in the empirical formula in Section \ref{mlpmeasurement}, it should take around $2.4$ DRAM roundtrip time.
-All a \lookup does is checking the result of \QueryLCP, so 2.4 is the ``theoretical cost'' for \lookup. 
-For \insertion, if there is no hash table movement due to conflict, we will only write addresses that are cache-resident, 
+All a $\lookup$ does is checking the result of \QueryLCP, so 2.4 is the ``theoretical cost'' for $\lookup$. 
+For $\insertion$, if there is no hash table movement due to conflict, we will only write addresses that are cache-resident, 
 which are also considered free in our model. 
-By collecting statastics, we observed that the average length of cuckoo replacement chain is around 0.5 per \insertion. 
-So \insertion should have a ``theoretical cost'' of 2.9.
-For \lowerbound, we always spend an additional DRAM request, 
+By collecting statastics, we observed that the average length of cuckoo replacement chain is around 0.5 per $\insertion$. 
+So $\insertion$ should have a ``theoretical cost'' of 2.9.
+For $\lowerbound$, we always spend an additional DRAM request, 
 so it has a ``theoretical cost'' of 3.4. We compare the above theoretical cost with the practical time 
 on the two data distributions in Table \ref{mlpindex_theory_practice}.
 
@@ -1762,38 +1780,38 @@ on the two data distributions in Table \ref{mlpindex_theory_practice}.
 \begin{tabular}{|c|c|c|c|}
 \hline
                              & Theory                      & Dist A                      & Dist B                      \\ \hline
-\lookup                      & 2.4                         & 1.58                        & 1.91                        \\ \hline
-\multirow{2}{*}{\insertion}  & 2.9                         & 2.10                        & 2.90                        \\ \cline{2-4} 
+$\lookup$                      & 2.4                         & 1.58                        & 1.91                        \\ \hline
+\multirow{2}{*}{$\insertion$}  & 2.9                         & 2.10                        & 2.90                        \\ \cline{2-4} 
                              & L+0.5                      & L+0.52                      & L+0.99                      \\ \hline
-\multirow{2}{*}{\lowerbound} & 3.4                         & 2.82                        & 3.05                        \\ \cline{2-4} 
+\multirow{2}{*}{$\lowerbound$} & 3.4                         & 2.82                        & 3.05                        \\ \cline{2-4} 
                              & \multicolumn{1}{c|}{L+1} & \multicolumn{1}{c|}{L+1.22} & \multicolumn{1}{c|}{L+1.14} \\ \hline
 \end{tabular}
 \caption{Theoretical (worst case spent in DRAM latency) and practical time for \MlpIndex to execute one operation, in DRAM roundtrip time.
-Insertion cost is amortized. $L$ represent the time for \lookup in respective column.}
+Insertion cost is amortized. $L$ represent the time for $\lookup$ in respective column.}
 \label{mlpindex_theory_practice}
 \end{table}
 
-The ``base'' difference, i.e. the time needed to execute one \QueryLCP or one \lookup, 
+The ``base'' difference, i.e. the time needed to execute one \QueryLCP or one $\lookup$, 
 is already explained by differece in average depth of the LCP node, which varies according to data set. 
-So now we will focus on the delta between \insertion / \lowerbound operation and \lookup operation.
+So now we will focus on the delta between $\insertion$ / $\lowerbound$ operation and $\lookup$ operation.
 
-In the theory model, \lowerbound should take 1 more DRAM roundtrip time than \lookup; 
+In the theory model, $\lowerbound$ should take 1 more DRAM roundtrip time than $\lookup$; 
 but in practice it takes around 1.2 more DRAM roundtrip time. 
 We believe the extra time is spent in finding the minimum child that is larger than the given one in the 256 fanouts of the LCP trie node. 
 We used multiple (cache-hitting) memory requests, SIMD operations and branches in the logic, 
 which, despite much faster than a cache miss, still requires non-negligible CPU time.
 
-\insertion involves non-negligible work to insert new nodes into hash table and update the extra-information fields along the path. 
+$\insertion$ involves non-negligible work to insert new nodes into hash table and update the extra-information fields along the path. 
 We note that the total number of nodes in the trie tree in distribution $A$ is smaller than that in distribution $B$, 
 since distribution $A$ has much more high degree nodes than distribution $B$ does.
-This results in less CPU work and less cuckoo hash displacements, which we believe is the reason that \insertion is faster on distribution $A$.
+This results in less CPU work and less cuckoo hash displacements, which we believe is the reason that $\insertion$ is faster on distribution $A$.
 
 \begin{table}[!htb]
 \centering
 \begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
 \multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
-                                                                             & \insertion   & \lookup   & \lowerbound   & \insertion   & \lookup   & \lowerbound   \\ \hline
+                                                                             & $\insertion$   & $\lookup$   & $\lowerbound$   & $\insertion$   & $\lookup$   & $\lowerbound$   \\ \hline
 Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
 EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
 \MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
@@ -1810,15 +1828,15 @@ std::set                                                                     & 0
 In this section, we briefly mention a few possible directions of future works. 
 
 While our skiplist iterator works seamlessly for lock-free skiplist, 
-\MlpPQ and \MlpIndex are currently single-threaded only. 
-It would be interesting to support a multi-threaded version of \MlpPQ and \MlpIndex.
+\MlpIndex is currently single-threaded only. 
+It would be interesting to support a multi-threaded version of \MlpIndex.
 What would be the best locking protocol for \MlpIndex? 
 Would it be fine-grained locking, read-optimized-write-exclusive locking, or even lock-free?
 How well would \MlpIndex perform in multi-threaded scenerio, 
 compared with other multi-threaded index structures, such as ROWEX ART \cite{art_sync}, Masstree \cite{masstree},
 lock-free skiplist \cite{lockfree_skiplist}, or Bw-Tree \cite{bwtree}?
 
-Currently we only support 64-bit keys for \MlpPQ and \MlpIndex. 
+Currently we only support 64-bit keys for \MlpIndex. 
 So another direction of work is to support general string keys. 
 For \MlpIndex, we will eventually need more than 2 layers of data structures, 
 for sufficiently long key. But what length is the correct breaking point?

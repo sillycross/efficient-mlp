@@ -1176,7 +1176,9 @@ we could only know the prefix of the node we want to lookup.
 If we use the represented string as the index, we would have a chicken and egg problem as 
 there is no way to know the path-compression string corresponding to a node
 until we locate that node in the hash table, which we can't because we don't know the path-compression string. 
-This leads to a node prototype as shown in the pseudocode below:
+This leads to a node prototype as shown in the pseudocode below.
+Figure \ref{mlpindex_structure_illustration} illustrates the recursive structure of \MlpIndex, 
+as well as how the pointers defined in the pseudocode points to each other.
 
 \singlespacing\begin{codebox}
 \begin{minted}{c++}
@@ -1208,6 +1210,12 @@ struct Node {
 };
 \end{minted}
 \end{codebox}\doublespacing
+
+\begin{figure}[!htb]
+  \includegraphics[width=\linewidth]{mlpindex_structure_illustration.png}
+\caption{Illustration of the recursive structure of \MlpIndex.}
+\label{mlpindex_structure_illustration}
+\end{figure}
 
 To find the LCP, we simply query all the $D$ levels of the trie. 
 Since we query every depth, path-compression is not a issue for us.

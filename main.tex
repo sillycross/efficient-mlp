@@ -1550,7 +1550,7 @@ so it supports \lowerbound but not \insertion.
 The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
 amongst a variety of binary search algorithm variants they investigated. 
 We used the variant that is emperically fastest on our machine, which is ``the 16-way implicit B-tree Eytzinger layout
-along with extensive low-level optimizations including conditional moves, prefetches''
+along with low-level optimizations such as conditional moves''
 (the ``btree16\_a'' variant in authors' benchmark).
 \item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
 We use the public-available implementation released along with the original paper.
@@ -1689,24 +1689,10 @@ Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machin
 \label{mlpindex_distB}
 \end{figure}
 
-\begin{table}[!htb]
-\centering
-\begin{tabular}{|c|c|c|c|c|c|c|}
-\hline
-\multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
-                                                                             & \insertion   & \lookup   & \lowerbound   & \insertion   & \lookup   & \lowerbound   \\ \hline
-Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
-EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
-\MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
-HOT                                                                          & 1.57         & 2.64      & 2.44          & 1.56         & 2.61      & 2.39          \\ \hline
-ART                                                                          & 1.65         & 2.00      & N/A           & 1.21         & 1.31      & N/A           \\ \hline
-std::set                                                                     & 0.71         & 0.67      & 0.67           & 0.73        & 0.67      & 0.67           \\ \hline
-\end{tabular}
-\caption{Raw throughput numbers in million operations per second.}
-\label{mlpindex_results}
-\end{table}
-
-As one can see, \MlpIndex, despite being an ordered index, has performance competitive with a well-engineered hash table.
+As one can see, \MlpIndex, despite being an ordered index, 
+has a performance competitive with a well-engineered hash table on \insertion and \lookup, 
+and its \lowerbound performance is even better than EBS, 
+the extensively optimized static-data-set binary search designed to specialize at \lowerbound.
 On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an \insertion and \lookup. 
 On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
 But still, when compared with state-of-the-art ordered index structures, 
@@ -1716,6 +1702,29 @@ and more than 2x faster than HOT on \lowerbound.
 On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 
 2.8x faster than HOT, 5.6x faster than ART on \lookup, 
 and 2x faster than HOT on \lowerbound.
+
+The comparison between \MlpIndex and EBS is especially interesting. 
+It may look surprising at first glance: how could it be possible for one to support fast insertions, 
+while simutanuously having a faster lookup than a data structure specially designed for static data sets?
+Plus that, the EBS authors also carefully engineered their memory layouts 
+to optimize the cache efficiency, as well as used a B-tree-like structure to decrease the length of the search.
+The key comes in two points. First, we are an integer data structure, while EBS is a comparison-based data structure. 
+This allows us to achieve theoretically better complexity, specifically, $O(\log\log M)$ verus $O(\log n)$. 
+Second, our design allows us to effectively leverage MLP to further shorten the DRAM dependency chain, 
+while EBS, essentially a carefully-layouted B-tree, can only move down level by level, 
+resulting in a longer DRAM dependency chain than us. 
+Prefetching cannot help either.
+Although it is a static B-tree, so we can know the address of the children nodes without having 
+the parent node fetched into memory, the best we can do is to prefetch all the $B$ children of a B-tree node, 
+which turns out to be too costy. Indeed, the experiments in the authors' repository 
+showed that prefetching only slow things down for all ``B-tree Eytzinger'' category algorithms.
+But why is the performance difference between \MlpIndex and EBS not so large? 
+The main reason is, EBS has an important advantage that we don't: it can leverage cache hierarchy much better than us. 
+Specifically, the top of its B-tree will be cache-resident, 
+so despite that it has a longer DRAM dependency chain, most of the accesses (except the last few) will hit L1/L2/L3 
+cache, making them cheaper (to a varied degree) than a real DRAM access. 
+However, this is not the case for us. We issue $D$ independent accesses in a batch, 
+and clearly not all of them are cache resident, so cache effect has little help for us.
 
 \MlpIndex, from algorithm level, is not input-data dependent. 
 Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
@@ -1778,6 +1787,23 @@ which, despite much faster than a cache miss, still requires non-negligible CPU 
 We note that the total number of nodes in the trie tree in distribution $A$ is smaller than that in distribution $B$, 
 since distribution $A$ has much more high degree nodes than distribution $B$ does.
 This results in less CPU work and less cuckoo hash displacements, which we believe is the reason that \insertion is faster on distribution $A$.
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
+                                                                             & \insertion   & \lookup   & \lowerbound   & \insertion   & \lookup   & \lowerbound   \\ \hline
+Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
+EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
+\MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
+HOT                                                                          & 1.57         & 2.64      & 2.44          & 1.56         & 2.61      & 2.39          \\ \hline
+ART                                                                          & 1.65         & 2.00      & N/A           & 1.21         & 1.31      & N/A           \\ \hline
+std::set                                                                     & 0.71         & 0.67      & 0.67           & 0.73        & 0.67      & 0.67           \\ \hline
+\end{tabular}
+\caption{Raw throughput numbers in million operations per second.}
+\label{mlpindex_results}
+\end{table}
 
 \section{Future Works} \label{futureworks}
 

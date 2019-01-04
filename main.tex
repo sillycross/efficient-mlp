@@ -275,7 +275,7 @@ B-tree operates faster since disk reads are done in blocks.
 Similarily, we might not read less locations from the memory than a conventional data structure does, 
 nonetheless we are much faster, because we are reading those locations in parallel.
 This ``ground-up'' approach turns out to be fruitful. 
-As an example, our \MlpIndex, an ordered index structure providing identical APIs as std::set, 
+As an example, our $\MlpIndex$, an ordered index structure providing identical APIs as std::set, 
 runs 3 to 4 times faster than the state-of-the-art ordered index, 
 while the algorithm being conceptually much easier to understand.
 
@@ -289,7 +289,7 @@ We employed our technique in MemSQL \cite{memsql},
 a commercial main-memory database that uses lock-free skiplist \cite{lockfree_skiplist} as their index data structure \cite{memsqladamblog}, 
 and demostrated that our technique achieves up to 1.9x single-threaded end-to-end query time speedup, and 1.5x to 1.9x
 total throughput when running on all cores.
-In Section \ref{orderedindex}, we present \MlpIndex, an ordered index for 64-bit integers 
+In Section \ref{orderedindex}, we present $\MlpIndex$, an ordered index for 64-bit integers 
 (and can be extended to support short strings), 
 inspired by x-fast trie \cite{xfast}, but re-designed from ground up to leverage memory level parallelism. 
 We demostrate that it can execute an $\insertion$ or $\lookup$ operation in time equivalent to around 2 DRAM roundtrips, 
@@ -863,27 +863,27 @@ As shown in Section \ref{misctricks}, this has a negative impact on the performa
 
 \section{Ordered Index} \label{orderedindex}
 
-In this section, we present \MlpIndex, an ordered index structure that supports identical APIs as std::set.
+In this section, we present $\MlpIndex$, an ordered index structure that supports identical APIs as std::set.
 Specifically, it supports $\insertion$ (insert an element into the set), $\lookup$ (query if an element exists in the set) 
 and $\lowerbound$ (find the minimum element in the set no smaller than the given element).
-\MlpIndex is not a comparison-based data structure, but an integer data structure that operates on a key universe $[0,M)$.
+$\MlpIndex$ is not a comparison-based data structure, but an integer data structure that operates on a key universe $[0,M)$.
 While our implementation currently only supports 64-bit keys ($M=2^{64}$), it could be extended to support any string keys as well.
 
-\MlpIndex takes a ``MLP-degree'' parameter $D$, 
+$\MlpIndex$ takes a ``MLP-degree'' parameter $D$, 
 which represents the capability of the hardware to track parallel DRAM requests, 
 analogous to that B-tree takes a ``block size'' parameter that characterizes the granularity of each disk read by the hardware.
 Under the assumption that $D$ independent parallel DRAM requests where each request touches one cache line can be completed in one roundtrip,
-\MlpIndex takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
+$\MlpIndex$ takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
 and $O(D\cdot\log_D\log M)$ CPU work to execute an $\insertion$, $\lookup$ or $\lowerbound$,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
 If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and $\simdgather$/ $\simdscatter$ operation), 
 the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
-To the best of our knowledge, \MlpIndex is practically the fastest ordered index. 
+To the best of our knowledge, $\MlpIndex$ is practically the fastest ordered index. 
 It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
 the state-of-the-art index published in 2018, on all operations,
 and about 4.5x faster than Adaptively Radix Tree (ART) \cite{arttrie_icde13}. 
-On a data set of 80 million 64-bit keys, single-threaded \MlpIndex only takes around 2 DRAM roundtrip time to perform 
+On a data set of 80 million 64-bit keys, single-threaded $\MlpIndex$ only takes around 2 DRAM roundtrip time to perform 
 an $\insertion$ or $\lookup$, and around 3 DRAM roundtrip time to perform an $\lowerbound$.
 We note that since the data set cannot fit into cache, 
 it is impossible for any algorithm to support the operations in less than the time of 1 DRAM roundtrip.
@@ -899,7 +899,7 @@ depending on the lookup results.
 $\insertion$ only writes to cache-resident addresses after the lookup 
 if there is no hash table movement due to conflict.
 
-\MlpIndex is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
+$\MlpIndex$ is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
 $O(\log \log M)$ per operation is the lower bound in time to support both $\insertion$ and $\lowerbound$ operation. 
 
@@ -912,7 +912,7 @@ However, it is unnecessary for us to build the stand-alone hash table at the cos
 because in practice our native $O(\log_D\log M)$ $\lookup$ is already almost as fast as a carefully-engineered hash table could do, 
 as shown in Section \ref{mlpindex_eval}.
 
-The core idea of \MlpIndex is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
+The core idea of $\MlpIndex$ is from x-fast trie \cite{xfast}, a data structure mostly considered in theory.
 X-fast trie supports $O(\log M)$ $\insertion$ and $O(\log\log M)$ $\lowerbound$, while using $O(n\log M)$ memory.
 While its $\lowerbound$ performance is theoretically optimal as proven in \cite{ajtai88comb-lowerbound},
 its huge constants hidden in the algorithm as well as huge memory consumption made it not considered useful in practice. 
@@ -935,7 +935,7 @@ As such, we deem the use of the ideas in y-fast trie to further reduce memory as
 
 In Section \ref{intro_xfast}, we briefly introduce the original idea of x-fast trie from \cite{xfast}. 
 In Section \ref{mlpindex_simple} and \ref{mlpindex}, 
-we elaborate the algorithm-level and engineering-level re-designs on the original idea that leads to \MlpIndex, 
+we elaborate the algorithm-level and engineering-level re-designs on the original idea that leads to $\MlpIndex$, 
 and in Section \ref{mlpindex_eval} we benchmark the performance against a few state-of-the-art ordered index implementations. 
 
 \subsection{Original x-fast Trie Idea} \label{intro_xfast}
@@ -1070,7 +1070,7 @@ bool Insert(Key x) {
 
 \subsection{The Core Idea of MLPIndex} \label{mlpindex_simple}
 
-In this section, we present the two core ideas that build up the theoretical aspect of \MlpIndex:
+In this section, we present the two core ideas that build up the theoretical aspect of $\MlpIndex$:
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
 \item Use $D$-ary search to replace binary search in $\QueryLCP$ for high memory level parallelism.
@@ -1350,7 +1350,7 @@ as shown in Figure \ref{mlpindex_insert}.
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{mlpindex_insert.png}
-\caption{Illustration of inserting a key into \MlpIndex}
+\caption{Illustration of inserting a key into $\MlpIndex$}
 \label{mlpindex_insert}
 \end{figure}
 
@@ -1360,17 +1360,17 @@ The ``path-compression'' serves exact purpose as the trick in van Emde Boas tree
 so only buckets containing at least 2 elements will build a sub-data-structure 
 (or in the language of path compression, non-root nodes with only 1 child are contracted, 
 and root node with only 1 child are specially treated), 
-So from a theoretical aspect, \MlpIndex can also be viewed as a hybridization of x-fast trie and van Emde Boas tree.
+So from a theoretical aspect, $\MlpIndex$ can also be viewed as a hybridization of x-fast trie and van Emde Boas tree.
 
 \subsection{The Fully-Fledged MLPIndex} \label{mlpindex}
 
-In this section, we present the ideas and tricks that are important to make \MlpIndex 
+In this section, we present the ideas and tricks that are important to make $\MlpIndex$ 
 extremely fast in practice. While the ideas are generally applicable, 
 we focus our examples on 64-bit key case, which is the case that we benchmark in Section \ref{mlpindex_eval}.
 
 \subsubsection*{Cuckoo Hashing}
 
-The bottleneck of \MlpIndex is the parallel hash table lookups, 
+The bottleneck of $\MlpIndex$ is the parallel hash table lookups, 
 specifically, the longest probe chain of the $D$ parallel lookups determined the number 
 of DRAM roundtrips needed to complete this query. 
 So we want a hash table that not only optimizes the average, but also the variance of a lookup. 
@@ -1381,14 +1381,14 @@ This allows worst-case 2 DRAM accesses, and even better, all DRAM requests issue
 
 The original cuckoo hashing scheme allows a maximum load factor of 50\%. 
 However one can improve to a load factor of 90\%+ with bucketized cuckoo \cite{bucketcuckoo}. 
-Due to time limitation, we are unable to implement the bucketized cuckoo fully for \MlpIndex. 
+Due to time limitation, we are unable to implement the bucketized cuckoo fully for $\MlpIndex$. 
 However, we implemented the out-of-box experiment that 
 demostrated the memory consumption we can achieve with a modified bucketized cuckoo, 
 which we will discuss in paragraph \ref{variantsizehash}.
 
 \subsubsection*{Lowest Level Bitmap} \label{lowestlevelbitmap}
 
-In \MlpIndex, we recurse to a subset of bits after a parallel hash table lookup. 
+In $\MlpIndex$, we recurse to a subset of bits after a parallel hash table lookup. 
 When the number of bits are small enough (say, $\leq 8$), we may use a bitmap 
 to directly store which children are existent. 
 Note that a bitmap is sufficient and we do not need to store the pointers to the children at all -- 
@@ -1402,7 +1402,7 @@ On 64-bit keys with $D=8$, we will only have 2 layers of the data structure.
 This trick allows us to work completely on cache-resident data when querying the second level, 
 so we effectively reduced the time by a factor of two for 64-bit case.
 
-After applying this optimization, the \MlpIndex structure for 64-bit keys is effectively 
+After applying this optimization, the $\MlpIndex$ structure for 64-bit keys is effectively 
 a path-compressed trie tree of fanout 256, with a 256-bit-long bitmap in each node to denote whether a child exists. 
 To find the $\lowerbound$ of a given key $x$, we first find the LCP node $n$ and LCP length $k$ (in bytes) in the trie 
 by lookup the 8 prefixes of $x$ in the hash tables. 
@@ -1426,7 +1426,7 @@ as shown in Figure \ref{mlpindex64_node}.
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{mlpindex64_node.png}
-\caption{The trie node structure for \MlpIndex on 64-bit keys.}
+\caption{The trie node structure for $\MlpIndex$ on 64-bit keys.}
 \label{mlpindex64_node}
 \end{figure}
 
@@ -1515,7 +1515,7 @@ So now, the total memory usage is bounded by 16 bytes times $2n$ nodes over 90\%
 which is around 36 bytes per 8-byte key.
 
 However, due to time limitation, we are unable to implement this bucketized cuckoo scheme 
-into \MlpIndex. All evaluations in Section \ref{mlpindex_eval} are done using the 96-byte-per-key version. 
+into $\MlpIndex$. All evaluations in Section \ref{mlpindex_eval} are done using the 96-byte-per-key version. 
 
 \subsubsection*{Flat Bitmap For Top Layers of Trie Tree}
 
@@ -1540,11 +1540,11 @@ a hash function family widely used in industry that is both extremely performant
 
 \subsection{Evaluation} \label{mlpindex_eval}
 
-In this section, we benchmark \MlpIndex on 64-bit keys against other state-of-the-art data structures. 
+In this section, we benchmark $\MlpIndex$ on 64-bit keys against other state-of-the-art data structures. 
 
 \subsubsection*{Benchmark Rivals}
 
-We benchmarked \MlpIndex against two fastest ordered index 
+We benchmarked $\MlpIndex$ against two fastest ordered index 
 structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
 We also benchmark against
 hash table and binary search, two well-known data structures that can only support a subset of the ordered index operations. 
@@ -1584,11 +1584,11 @@ We did not benchmark against comparison-based data structures such as the B-tree
 (STX B-tree \cite{stx_btree}, FAST \cite{fast_sigmod10}, etc), 
 or Masstree \cite{masstree} (a B-tree/trie-tree hybrid data structure),
 since they are much slower on 64-bit keys than HOT and ART, as shown in both papers \cite{hot_sigmod18, arttrie_icde13}.
-Everything is single-threaded in the benchmark, and 1GB huge page is used for \MlpIndex, EBS and dense\_hash\_set. 
-Our implementation of \MlpIndex is available at \cite{mlpds_repo}.
+Everything is single-threaded in the benchmark, and 1GB huge page is used for $\MlpIndex$, EBS and dense\_hash\_set. 
+Our implementation of $\MlpIndex$ is available at \cite{mlpds_repo}.
 
-Finally, we also ``benchmark'' \MlpIndex against itself, 
-by comparing \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
+Finally, we also ``benchmark'' $\MlpIndex$ against itself, 
+by comparing $\MlpIndex$'s ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
 with its practical performance. 
 
 \subsubsection*{Data Distribution and Configuration}
@@ -1678,7 +1678,7 @@ END_TIMING();
 \end{codebox}\doublespacing
 
 We note that this ``query encryption'' only make significant (1.5x to 2x) difference on hash table, mainly due to its extremely simple logic. 
-For ordered index, all benchmarked implementation, including \MlpIndex, becomes slower, but only by a small degree (less than 10\%). 
+For ordered index, all benchmarked implementation, including $\MlpIndex$, becomes slower, but only by a small degree (less than 10\%). 
 This is as expected: since CPU speculative execution only have a small window, it is unsurprising that it 
 cannot penetrate complicated logic effectively. 
 
@@ -1703,7 +1703,7 @@ Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machin
 \label{mlpindex_distB}
 \end{figure}
 
-As one can see, \MlpIndex, despite being an ordered index, 
+As one can see, $\MlpIndex$, despite being an ordered index, 
 has a performance competitive with a well-engineered hash table on $\insertion$ and $\lookup$, 
 and its $\lowerbound$ performance is even better than EBS, 
 the extensively optimized static-data-set binary search designed to specialize at $\lowerbound$.
@@ -1717,7 +1717,7 @@ On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on $\insert
 2.8x faster than HOT, 5.6x faster than ART on $\lookup$, 
 and 2x faster than HOT on $\lowerbound$.
 
-The comparison between \MlpIndex and EBS is especially interesting. 
+The comparison between $\MlpIndex$ and EBS is especially interesting. 
 It may look surprising at first glance: how could it be possible for one to support fast insertions, 
 while simutanuously having a faster lookup than a data structure specially designed for static data sets?
 Plus that, the EBS authors also carefully engineered their memory layouts 
@@ -1732,7 +1732,7 @@ the parent node fetched into memory,
 the best one can do to ``look-ahead'' one level is still to prefetch all the $B$ children of a B-tree node, 
 which turns out to be too costy. Indeed, the experiments in the authors' repository 
 showed that prefetching only slow things down for all ``B-tree Eytzinger'' category algorithms.
-But why is the performance difference between \MlpIndex and EBS not so large? 
+But why is the performance difference between $\MlpIndex$ and EBS not so large? 
 The main reason is, EBS has an important advantage that we don't: it can leverage cache hierarchy much better than us. 
 Specifically, the top of its B-tree will be cache-resident, 
 so despite that it has a longer DRAM dependency chain, many accesses at the beginning of the chain will hit L1/L2/L3 
@@ -1744,7 +1744,7 @@ and while in benchmark one can exclusively own all the caches, it is impractical
 as all the other components in a real application will use cache space as well. 
 So the fact that our performance does not rely much on L2/L3 cache is actually an advantage in real world.
 
-\MlpIndex, from algorithm level, is not input-data dependent. 
+$\MlpIndex$, from algorithm level, is not input-data dependent. 
 Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
 then additionally do hash table insertion for $\insertion$, or an additional hash table lookup for $\lowerbound$. 
 Why is it slower on Distribution $B$ than Distribution $A$? 
@@ -1786,7 +1786,7 @@ $\lookup$                      & 2.4                         & 1.58             
 \multirow{2}{*}{$\lowerbound$} & 3.4                         & 2.82                        & 3.05                        \\ \cline{2-4} 
                              & \multicolumn{1}{c|}{L+1} & \multicolumn{1}{c|}{L+1.22} & \multicolumn{1}{c|}{L+1.14} \\ \hline
 \end{tabular}
-\caption{Theoretical (worst case spent in DRAM latency) and practical time for \MlpIndex to execute one operation, in DRAM roundtrip time.
+\caption{Theoretical (worst case spent in DRAM latency) and practical time for $\MlpIndex$ to execute one operation, in DRAM roundtrip time.
 Insertion cost is amortized. $L$ represent the time for $\lookup$ in respective column.}
 \label{mlpindex_theory_practice}
 \end{table}
@@ -1814,7 +1814,7 @@ This results in less CPU work and less cuckoo hash displacements, which we belie
                                                                              & \ $\insertion\ $   & \ $\lookup\ $   & $\lowerbound$   & \ $\insertion\ $   & \ $\lookup\ $   & $\lowerbound$   \\ \hline
 Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
 EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
-\MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
+$\MlpIndex$                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
 HOT                                                                          & 1.57         & 2.64      & 2.44          & 1.56         & 2.61      & 2.39          \\ \hline
 ART                                                                          & 1.65         & 2.00      & N/A           & 1.21         & 1.31      & N/A           \\ \hline
 std::set                                                                     & 0.71         & 0.67      & 0.67           & 0.73        & 0.67      & 0.67           \\ \hline
@@ -1828,17 +1828,17 @@ std::set                                                                     & 0
 In this section, we briefly mention a few possible directions of future works. 
 
 While our skiplist iterator works seamlessly for lock-free skiplist, 
-\MlpIndex is currently single-threaded only. 
-It would be interesting to support a multi-threaded version of \MlpIndex.
-What would be the best locking protocol for \MlpIndex? 
+$\MlpIndex$ is currently single-threaded only. 
+It would be interesting to support a multi-threaded version of $\MlpIndex$.
+What would be the best locking protocol for $\MlpIndex$? 
 Would it be fine-grained locking, read-optimized-write-exclusive locking, or even lock-free?
-How well would \MlpIndex perform in multi-threaded scenerio, 
+How well would $\MlpIndex$ perform in multi-threaded scenerio, 
 compared with other multi-threaded index structures, such as ROWEX ART \cite{art_sync}, Masstree \cite{masstree},
 lock-free skiplist \cite{lockfree_skiplist}, or Bw-Tree \cite{bwtree}?
 
-Currently we only support 64-bit keys for \MlpIndex. 
+Currently we only support 64-bit keys for $\MlpIndex$. 
 So another direction of work is to support general string keys. 
-For \MlpIndex, we will eventually need more than 2 layers of data structures, 
+For $\MlpIndex$, we will eventually need more than 2 layers of data structures, 
 for sufficiently long key. But what length is the correct breaking point?
 What is the best ``query execution plan'' for each key length?
 For longer string keys, a lot of our sub-data-structures will only be managing a small set of keys. 

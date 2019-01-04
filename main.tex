@@ -1174,8 +1174,10 @@ struct Node {
     // The string represented by this node
     // which is prefix + path-compressed string
     Key fullKey;
+    // The hash table storing all nodes in this DS
+    HashTable* hashTable;
     // Additional information as in original x-fast trie
-    // Min and max node in this subtree
+    // Min and max node in this subtree 
     Node* min, max;
     // Leaf-links if this node is a leaf
     Node* prev, succ;
@@ -1183,9 +1185,12 @@ struct Node {
     // if it is, then it must be the root of its parent DS,
     // and fullKey is the only key stored in this DS
     bool isSpecialIntermediateNode;
-    // A recursive DS to manage the children of this node
-    // The recursive DS works on a key universe of length len / D
+    // A recursive DS to manage the children of this node,
+    // which works on a key universe of length len / D bits
     Node* children;
+    // The parent DS of this DS, 
+    // which works on a key universe of length len * D bits
+    Node* parent;
 };
 \end{minted}
 \end{codebox}\doublespacing
@@ -1225,7 +1230,7 @@ Node* QueryLCP(Node* t, Key x, int currentDepth) {
         int len = i * step;
         // substring [0, currentDepth+len) of x
         Key prefixToFind = x[0:currentDepth+len];
-        Node* n = hashTable.Find(prefixToFind);
+        Node* n = t->hashTable.Find(prefixToFind);
         if (n != nullptr) {
             lcpNode = n;
         } 
@@ -1262,8 +1267,64 @@ bool Lookup(Node* root, Key x) {
 \end{minted}
 \end{codebox}\doublespacing
 
-\lowerbound operation can also be built upon \QueryLCP and the extra information 
-carried on the node, using identical idea as the original x-fast trie. We omit the pseudocode.
+\lowerbound operation can also be supported in $O(\log_D\log M)$ by \QueryLCP and the extra information 
+carried on the node, using identical idea as the original x-fast trie. 
+There are only two complications compared with the original x-fast trie: 
+first, we need to handle the case that the path-compression string does not match; 
+second, that the children of a node is managed by a recursive data structure, 
+so we need to find the \lowerbound of the LCP string first, 
+by finding the lower bound among the children if possible, 
+and going upward to the parent data structure if the lower bound does not exist in children.
+After we find the \lowerbound of the LCP string, 
+the real \lowerbound is the smallest string starting with the LCP string, 
+which can also be found by going upward the parent data structure.
+The pseudocode can be found below:
+
+\singlespacing\begin{codebox}
+\begin{minted}{c++}
+// Returns the minimum key no smaller than key x
+Key Lower_Bound(Node* root, Key x) {
+    Node* n = QueryLCP(root, x, 0 /*currentDepth*/);
+    // Recall that the property of LCP node is that 
+    // everything in the subtree is either all smaller, 
+    // or all bigger than key x
+    bool isAllSmallerThanKey;
+    int fullKeyLen = n->fullKey.length();
+    if (n->fullKey != x[0:fullKeyLen]) {
+        // If path-compression string does not match
+        isAllSmallerThanKey = (n->fullKey < x[0:fullKeyLen]);
+    } else {
+        // path-compressions string matches, 
+        // then n being LCP node implies that all children 
+        // must start with bit k, and x starts with bit 1-k
+        isAllSmallerThanKey = (x[fullKeyLen] == 1);
+    }
+    // Find the lower bound of node n, 
+    // using the same idea as in x-fast trie
+    if (isAllSmallerThanKey) {
+        while (n->max->succ == nullptr) {
+            // this child is largest among the children
+            // we have to move backward to its parent DS
+            n = n->parent;
+        }
+        n = n->max->succ;
+    } else {
+        n = n->min;
+    }
+    // The answer is the smallest key with n->fullKey as prefix
+    while (n->parent) {
+        // Invarient: n is the leaf node in its DS,
+        // so this must correspond to a node in its parent DS
+        // Locate it by probing the hash table of the parent DS
+        n = n->parent->hashTable.Find(n->fullKey);
+        // We are now in the parent DS, 
+        // move to the min node in this subtree 
+        n = n->min;
+    }
+    return n->fullKey;
+}
+\end{minted}
+\end{codebox}\doublespacing
 
 Inserting into the data structure is conceptually very similar to how one inserts into a conventional 
 path-compressed trie.
@@ -1465,23 +1526,58 @@ a hash function family widely used in industry that is both extremely performant
 
 \subsection{Evaluation} \label{mlpindex_eval}
 
-In this section, we benchmark \MlpIndex on 64-bit keys against two fastest ordered index 
-structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) 
-\footnote{While Adaptive Radix Tree (ART) could support \lowerbound queries, 
+In this section, we benchmark \MlpIndex on 64-bit keys against other state-of-the-art data structures. 
+
+\subsubsection*{Benchmark Rivals}
+
+We benchmarked \MlpIndex against two fastest ordered index 
+structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
+Besides ordered index structures, we additionally included 
+hash table and binary search, two well-known data structures that can only support a subset of the operations. 
+Since they are data structures designed to specialize on a certain type of operation, 
+it demostrates the cost we took to support all operations simutanuously. 
+The details of our benchmark rivals can be find below:
+\begin{itemize}
+[topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
+\item \textit{HashTable}: a hash table supports \insertion and \lookup in $O(1)$ expected time, but cannot support \lowerbound queries.
+We used Google's dense\_hash\_set \cite{densehashset},
+a quadratic probing hash table scheme widely used in industry.
+The effective load factor of the dense\_hash\_set is 60\%, 
+though the performance is almost the same with a effective load factor of 30\%.
+\item \textit{EBS} \cite{binary_search_layout}: short for ``Binary Search on Eytzinger-layout static array''. 
+As the name suggests, it is a carefully engineered binary search on a static data set, 
+so it supports \lowerbound but not \insertion.
+The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
+amongst a variety of binary search algorithm variants they investigated. 
+We used the variant that is emperically fastest on our machine, which is ``the 16-way implicit B-tree Eytzinger layout
+along with extensive low-level optimizations including conditional moves, prefetches''
+(the ``btree16\_a'' variant in authors' benchmark).
+\item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
+We use the public-available implementation released along with the original paper.
+We believe we configured the library correctly,
+as the numbers we get generally match what are demostrated in the original paper (it is slightly slower 
+because we are using a larger data set, and our CPU frequency is slower than the CPU in their paper).
+\item \textit{ART} \cite{arttrie_icde13}: this was the fastest ordered index structure we are aware of, before HOT was published.
+We use the public-available implementation released along with the original paper.
+It is a single-file library so there is no potential configuration issue.
+We note that while ART could support \lowerbound queries, 
 the public-available implementation only supports prefix-search, 
 which is more restrictive than general \lowerbound. 
-As such we are unable to test the \lowerbound performance for ART.} \cite{arttrie_icde13}.
+As such we are unable to test the \lowerbound performance for ART.
+\end{itemize}
+
 We did not benchmark against comparison-based data structures such as the B-tree variants 
 (STX B-tree \cite{stx_btree}, FAST \cite{fast_sigmod10}, etc), 
 or Masstree \cite{masstree} (a B-tree/trie-tree hybrid data structure),
 since they are much slower on 64-bit keys than HOT and ART, as shown in both papers \cite{hot_sigmod18, arttrie_icde13}.
-Besides ordered index structures, we also benchmark our performance against hash table, which cannot support \lowerbound queries. 
-The hash table library we used is Google's dense\_hash\_set \cite{densehashset},
-which is a quadratic probing bucketized hash scheme widely used in industry.
-The effective load factor of the dense\_hash\_set is 60\%.
-We also compare \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
-with its practical performance. Everything is single-threaded in the evaluation, and 1GB huge page is used. 
-Our implementation of \MlpIndex is available at \url{https://github.com/sillycross/mlpds}.
+Everything is single-threaded in the benchmark, and 1GB huge page is used for \MlpIndex, EBS and dense\_hash\_set. 
+Our implementation of \MlpIndex is available at \cite{mlpds_repo}.
+
+Finally, we also ``benchmark'' \MlpIndex against itself, 
+by comparing \MlpIndex's ``theoretical'' performance derived from the models built in Section \ref{understandmlp} 
+with its practical performance. 
+
+\subsubsection*{Data Distribution and Configuration}
 
 We use a family of data distribution similar to the ones used in \cite{masstree}, which \cite{masstree} calls ``decimal distribution''. 
 In this distribution, we generate the key byte by byte, and each byte is randomly selected from a set of candidates, 
@@ -1572,19 +1668,10 @@ For ordered index, all benchmarked implementation, including \MlpIndex, becomes 
 This is as expected: since CPU speculative execution only have a small window, it is unsurprising that it 
 cannot penetrate complicated logic effectively. 
 
+\subsubsection*{Benchmark Results}
+
 The benchmark results on data distribution $A$ and $B$ can be found in Figure \ref{mlpindex_distA} and \ref{mlpindex_distB} respectively.
 Raw numbers can be found in Table \ref{mlpindex_results}.
-
-As one can see, \MlpIndex, despite being an ordered index, has performance competitive with a well-engineered hash table.
-On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an \insertion and \lookup. 
-On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
-But still, when compared with state-of-the-art ordered index structures, 
-on distribution $A$, we are 4.3x faster than HOT and ART on \insertion, 
-3.5x faster than HOT and 4.5x faster than ART on \lookup, 
-and more than 2x faster than HOT on \lowerbound. 
-On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 
-2.8x faster than HOT, 5.6x faster than ART on \lookup, 
-and 2x faster than HOT on \lowerbound.
 
 \begin{figure}[!htb]
 \centering
@@ -1609,6 +1696,7 @@ Each unit of Y-axis represent 70ns, which is 1 DRAM roundtrip time on the machin
 \multirow{2}{*}{} & \multicolumn{3}{c|}{Data Distribution A} & \multicolumn{3}{c|}{Data Distribution B} \\ \cline{2-7} 
                                                                              & \insertion   & \lookup   & \lowerbound   & \insertion   & \lookup   & \lowerbound   \\ \hline
 Hash Table                                                                    & 10.44        & 12.50     & N/A           & 10.37        & 12.34     & N/A           \\ \hline
+EBS                                                                          & N/A          & 3.72     & 3.70           & N/A          & 3.74      & 3.72           \\ \hline
 \MlpIndex                                                                    & 6.80         & 9.03      & 5.06          & 4.93         & 7.40      & 4.69          \\ \hline
 HOT                                                                          & 1.57         & 2.64      & 2.44          & 1.56         & 2.61      & 2.39          \\ \hline
 ART                                                                          & 1.65         & 2.00      & N/A           & 1.21         & 1.31      & N/A           \\ \hline
@@ -1617,6 +1705,17 @@ std::set                                                                     & 0
 \caption{Raw throughput numbers in million operations per second.}
 \label{mlpindex_results}
 \end{table}
+
+As one can see, \MlpIndex, despite being an ordered index, has performance competitive with a well-engineered hash table.
+On data distribution $A$, we only take 1.5x and 1.4x the time of the hash table respectively, to do an \insertion and \lookup. 
+On distribution $B$ our performance is slightly worse: 2.1x and 1.7x respectively. 
+But still, when compared with state-of-the-art ordered index structures, 
+on distribution $A$, we are 4.3x faster than HOT and ART on \insertion, 
+3.5x faster than HOT and 4.5x faster than ART on \lookup, 
+and more than 2x faster than HOT on \lowerbound. 
+On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on \insertion, 
+2.8x faster than HOT, 5.6x faster than ART on \lookup, 
+and 2x faster than HOT on \lowerbound.
 
 \MlpIndex, from algorithm level, is not input-data dependent. 
 Indeed, for 64-bit keys, all we do is going through a series of parallel hash table lookup, 
@@ -1722,7 +1821,7 @@ typically a few times faster than the current state-of-the-arts.
 \section*{Acknowledgements}
 
 I am grateful to my mentor Vladimir Kiriansky for his extensive help and discussions throughout the research 
-and the writing of this paper. Thanks Martin Rinard for his review and advice on writing the paper. 
+and the writing of this paper. Thanks Saman Amarasinghe, Martin Rinard for the review and advice on writing the paper. 
 
 \bibliography{ref}{}
 \bibliographystyle{plain}

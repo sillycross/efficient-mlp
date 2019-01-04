@@ -1532,8 +1532,8 @@ In this section, we benchmark \MlpIndex on 64-bit keys against other state-of-th
 
 We benchmarked \MlpIndex against two fastest ordered index 
 structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
-Besides ordered index structures, we additionally included 
-hash table and binary search, two well-known data structures that can only support a subset of the operations. 
+We also benchmark against
+hash table and binary search, two well-known data structures that can only support a subset of the ordered index operations. 
 Since they are data structures designed to specialize on a certain type of operation, 
 it demostrates the cost we took to support all operations simutanuously. 
 The details of our benchmark rivals can be find below:
@@ -1713,7 +1713,7 @@ This allows us to achieve theoretically better complexity, specifically, $O(\log
 Second, our design allows us to effectively leverage MLP to further shorten the DRAM dependency chain, 
 while EBS, essentially a carefully-layouted B-tree, can only move down level by level, 
 resulting in a longer DRAM dependency chain than us. 
-Prefetching cannot help either.
+Prefetching cannot help EBS either.
 Although it is a static B-tree, so we can know the address of the children nodes without having 
 the parent node fetched into memory, the best we can do is to prefetch all the $B$ children of a B-tree node, 
 which turns out to be too costy. Indeed, the experiments in the authors' repository 
@@ -1721,7 +1721,7 @@ showed that prefetching only slow things down for all ``B-tree Eytzinger'' categ
 But why is the performance difference between \MlpIndex and EBS not so large? 
 The main reason is, EBS has an important advantage that we don't: it can leverage cache hierarchy much better than us. 
 Specifically, the top of its B-tree will be cache-resident, 
-so despite that it has a longer DRAM dependency chain, most of the accesses (except the last few) will hit L1/L2/L3 
+so despite that it has a longer DRAM dependency chain, many accesses at the beginning of the chain will hit L1/L2/L3 
 cache, making them cheaper (to a varied degree) than a real DRAM access. 
 However, this is not the case for us. We issue $D$ independent accesses in a batch, 
 and clearly not all of them are cache resident, so cache effect has little help for us.

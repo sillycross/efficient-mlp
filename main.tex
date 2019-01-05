@@ -876,13 +876,15 @@ Under the assumption that $D$ independent parallel DRAM requests where each requ
 $\MlpIndex$ takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
 and $O(D\cdot\log_D\log M)$ CPU work to execute an $\insertion$, $\lookup$ or $\lowerbound$,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
-If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and $\simdgather$/ $\simdscatter$ operation), 
+If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and $\simdgather$ / $\simdscatter$ operation), 
 the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
 To the best of our knowledge, $\MlpIndex$ is practically the fastest ordered index. 
-It is 3 to 4 times faster than Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
-the state-of-the-art index published in 2018, on all operations,
-and about 4.5x faster than Adaptively Radix Tree (ART) \cite{arttrie_icde13}. 
+Compared with Height Optimized Trie (HOT) \cite{hot_sigmod18}, 
+the fastest state-of-the-art ordered index we are aware of, 
+$\MlpIndex$ is 3x to 4x faster on $\insertion$ and $\lookup$, 
+and 2x faster on $\lowerbound$.
+Compared with Adaptively Radix Tree (ART) \cite{arttrie_icde13}, $\MlpIndex$ is 4x to 4.5x faster. 
 On a data set of 80 million 64-bit keys, single-threaded $\MlpIndex$ only takes around 2 DRAM roundtrip time to perform 
 an $\insertion$ or $\lookup$, and around 3 DRAM roundtrip time to perform an $\lowerbound$.
 We note that since the data set cannot fit into cache, 
@@ -1335,7 +1337,7 @@ Key Lower_Bound(Node* root, Key x) {
     }
     // The answer is the smallest key with n->fullKey as prefix
     while (n->parent) {
-        // Invarient: n is the leaf node in its DS,
+        // Invariant: n is the leaf node in its DS,
         // so this must correspond to a node in its parent DS
         // Locate it by probing the hash table of the parent DS
         n = n->parent->hashTable.Find(n->fullKey);
@@ -1573,7 +1575,7 @@ The authors of \cite{binary_search_layout} concluded that this is the fastest bi
 amongst a variety of binary search algorithm variants they investigated. 
 We used the variant that is emperically fastest on our machine, which uses 16-way implicit B-tree layout + Eytzinger layout
 + ``low-level optimizations such as unrolling and conditional moves''
-(the ``btree16\_a'' variant in authors' benchmark).
+(the ``btree16\_a'' variant in authors' benchmark). It is around 2x faster than std::lower\_bound.
 \item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
 We use the public-available implementation released along with the original paper.
 We believe we configured the library correctly,
@@ -1623,7 +1625,7 @@ with only a small probability). The final positive rate for $\lookup$ is control
 Keys for $\lowerbound$ queries are generated using the same distribution as the original data set is generated. 
 About 15\% of the $\lowerbound$ query keys appeared in original data set, the remaining 85\% do not. 
 
-In order to more accurately measure the time need to execute one operation, 
+In order to more accurately measure the time needed to execute one operation, 
 we want to make sure that each query is indeed executed ``independently'', 
 so the total time over total number of queries indeed reflects what it takes to execute one query. 
 To see what it means, we will use the cuckoo hash table as an example. 

@@ -123,8 +123,6 @@
 
 \begin{center}
 
-\
-
 6.UAP Project Report
 
 \
@@ -135,6 +133,37 @@ Saman Amarasinghe,
 Martin Rinard
 
 \end{center}
+
+\vspace{1cm}
+
+\begin{abstract}
+
+A large class of indexing workloads is memory latency bounded: 
+while the DRAM chip could support a high bandwidth, 
+the CPU is only able to effectively use a small portion of the bandwidth, 
+as most of the time it is stalling on memory latency.
+
+Memory level parallelism is a CPU feature available on most of the 21-century CPUs 
+that supports fetching multiple independent DRAM addresses to CPU cache in parallel. 
+By allowing the CPU to read multiple addresses in one DRAM roundtrip,
+memory level parallelism has the potential to speed up those memory-latency bounded workloads.
+
+However, most of the prior research on optimizing indexing workloads via memory level parallelism 
+are based on software pipelining technique \cite{hashjoin_icde04, fast_sigmod10, amac_vldb15, operatorfusion_vldb17, cimple_pact18}, 
+which could only support batched read-only workloads on a static data set, 
+making them only useful in specific scenarios. 
+We took a different approach. We design new data structures from ground up that leverages MLP, 
+which allows us to fully overcome the limitation of software pipelining. 
+Our data structures support any mixed workload, do not require any batching, 
+and provide identical APIs as their conventional counterparts.
+
+In this report, we present two MLP-grounded data structure -- a lock-free skiplist iterator 
+and an ordered index. 
+While maintaining identical APIs as their conventional counterparts, 
+they achieve the performance not considered possible before, 
+typically a few times faster than the current state-of-the-arts. 
+
+\end{abstract}
 
 \newpage
 
@@ -1583,9 +1612,10 @@ As the name suggests, it is a carefully engineered binary search on a static dat
 so it supports $\lowerbound$ but not $\insertion$.
 The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
 amongst a variety of binary search algorithm variants they investigated. 
-We used the variant that is emperically fastest on our machine, which uses 16-way implicit B-tree layout + Eytzinger layout
+We used the variant that is emperically fastest on our machine, which uses 16-way implicit B-tree Eytzinger layout
 + ``low-level optimizations such as unrolling and conditional moves''
-(the ``btree16\_a'' variant in authors' benchmark). It is around 2x faster than std::lower\_bound.
+(the ``btree16\_a'' variant in authors' benchmark). 
+EBS is around 2x faster than the straightforward approach of invoking std::lower\_bound on a sorted array.
 \item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
 We use the public-available implementation released along with the original paper.
 We believe we configured the library correctly,
@@ -1616,7 +1646,7 @@ with its practical performance.
 We use a family of data distribution similar to the ones used in \cite{masstree}, which \cite{masstree} calls ``decimal distribution''. 
 In this distribution, we generate the key byte by byte, and each byte is randomly selected from a set of candidates, 
 which may vary depending on the position of this byte in the key.
-The trie tree built from this distribution have both high-degree and low-degree nodes, 
+The trie tree built from this distribution has both high-degree and low-degree nodes, 
 and while path compression can help lower the height of the trie, it will not ``collapse'' the trie 
 to essentially a big flat array like the uniform random distribution would. 
 As such, we believe this distribution family is a balanced test that 
@@ -1885,7 +1915,7 @@ typically a few times faster than the current state-of-the-arts.
 \section*{Acknowledgements}
 
 I am grateful to my mentor Vladimir Kiriansky for his extensive help and discussions throughout the research 
-and the writing of this paper. Thanks Saman Amarasinghe, Martin Rinard for the review and advice on writing the paper. 
+and the writing of this paper. Thanks Saman Amarasinghe, Yinzhan Xu and Martin Rinard for the review and advice on writing the paper. 
 Thanks MemSQL Inc. for providing the opportunity to evaluate my skiplist iterator in a real database, 
 as well as their CTO Drew Paroski, for the permission to release my findings to public.
 

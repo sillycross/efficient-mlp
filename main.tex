@@ -208,10 +208,12 @@ There is one outstanding prefetch for each query at any time,
 and those prefetches will be executed in parallel thanks to CPU memory level parallelism capability.
 
 As far as we are aware of, all existing methods to leverage MLP are based on the abovementioned ``software pipelining'' technique.
-This technique can be used to support batched-read operations of a number of widely used data structures, 
-including hash table, binary search, binary search tree, skiplist and trie tree, as shown in \cite{cimple_pact18, fast_sigmod10}.
+This technique can be used to support batched-read operations on static data set, for a number of widely used data structures, 
+including hash table, binary search, binary search tree, skiplist and B-tree, as shown in \cite{cimple_pact18, fast_sigmod10}.
 The authors of \cite{cimple_pact18} demostrated that the technique delievers up to 6.4x single-thread speedup, 
-and 2.5x total throughput when running on all cores.
+and 2.5x total throughput when running on all cores. 
+The authors of \cite{fast_sigmod10} demostrated 50M peak throughput 
+on a quad-core Intel Core i7 CPU for B-tree lookup on 32-bit integer keys.
 
 AMAC \cite{amac_vldb15} is an improvement to the software pipeline technique 
 that addresses the issue that some queries may have less or more phases than others 
@@ -275,9 +277,17 @@ B-tree operates faster since disk reads are done in blocks.
 Similarily, we might not read less locations from the memory than a conventional data structure does, 
 nonetheless we are much faster, because we are reading those locations in parallel.
 This ``ground-up'' approach turns out to be fruitful. 
-As an example, our $\MlpIndex$, an ordered index structure providing identical APIs as std::set, 
-runs 3 to 4 times faster than the state-of-the-art ordered index, 
-while the algorithm being conceptually much easier to understand.
+First, by designing data structures from ground up, 
+we are able to make design choices to release the power of MLP to maximum, 
+and achieve performance not considered possible before. 
+As an example, our ordered index structure $\MlpIndex$ is up to 4x faster 
+than the fastest state-of-the-art ordered index we are aware of.
+Second, by supporting identical APIs as traditional data structures, 
+we are able to integrate our data structures into real industrial software 
+without too much effort. 
+As an example, despite that what we are modifying is at the core of the codebase,
+we only spent a couple of days to replace the skiplist iterator with our version in MemSQL \cite{memsql}, 
+an industrial database containing more than a million lines of code.
 
 The rest of the paper is organized as follows. 
 In Section \ref{understandmlp}, we measure the effect of memory level parallelism on a set of real-world CPUs, 
@@ -299,7 +309,7 @@ we are 3 to 4 times faster on $\insertion$ and $\lookup$, and 2x faster on $\low
 We additionally note that our $\insertion$ and $\lookup$ performance is only slightly slower than a well-engineered hash table \cite{densehashset}, 
 which cannot support range queries like $\lowerbound$;
 and that our $\lowerbound$ performance is even better than EBS \footnote{The authors did not name their algorithm officially.
-We will refer to this algorithm by EBS, since it employs \textbf{E}ytzinger layout and \textbf{B}-tree-like multi-way \textbf{S}earch.} \cite{binary_search_layout}, 
+We will refer to their algorithm by EBS, since it employs \textbf{E}ytzinger layout and \textbf{B}-tree-like multi-way \textbf{S}earch.} \cite{binary_search_layout}, 
 an extensively optimized binary search algorithm on a static data set, which cannot support $\insertion$.
 %We also note that while most of the current state-of-the-arts ordered index are based on trie tree, 
 %which makes their performance inheritally dependent on the input data distribution, 

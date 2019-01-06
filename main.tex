@@ -1414,6 +1414,22 @@ so only buckets containing at least 2 elements will build a sub-data-structure
 (or in the language of path compression, non-root nodes with only 1 child are contracted, 
 and root node with only 1 child are specially treated), 
 So from a theoretical aspect, $\MlpIndex$ can also be viewed as a hybridization of x-fast trie and van Emde Boas tree.
+We summarize the theoretical complexity of relevant data structures in Table \ref{ordered_index_theoretical_comparison}.
+
+\begin{table}[!htb]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+              & x-fast          & y-fast          & vEB + HT & \begin{tabular}[c]{@{}c@{}}$\MlpIndex$\\ (No SIMD/MLP)\end{tabular}            & $\MlpIndex$ \\ \hline
+$\insertion$  & $O(\log M)$     & $O(\log\log M)$ & $O(\log\log M)$ & $O(D\cdot\log_D\log M)$ & \textcolor{red}{$O(\log_D\log M)$}  \\ \hline
+$\lowerbound$ & $O(\log\log M)$ & $O(\log\log M)$ & $O(\log\log M)$ & $O(D\cdot\log_D\log M)$ & \textcolor{red}{$O(\log_D\log M)$}  \\ \hline
+Memory  & $O(n\log M)$     & \textcolor{red}{$O(n)$}          & $O(n\log\log M)$ & $O(n\log_D\log M)$       & $O(n\log_D\log M)$  \\ \hline
+\end{tabular}
+\caption{Comparison on theoretical complexity of relevant data structures.
+The $\MlpIndex$ column assumes that $D$ independent DRAM requests can be completed in one DRAM roundtrip, 
+and $D$-vectorized SIMD instructions are available.}
+\label{ordered_index_theoretical_comparison}
+\end{table}
 
 \subsection{The Fully-Fledged MLPIndex} \label{mlpindex}
 

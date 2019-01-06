@@ -138,7 +138,7 @@ Martin Rinard
 
 \begin{abstract}
 
-A large class of indexing workloads is memory latency bounded: 
+A large class of indexing workloads is memory latency bound: 
 while the DRAM chip could support a high bandwidth, 
 the CPU is only able to effectively use a small portion of the bandwidth, 
 as most of the time it is stalling on memory latency.
@@ -146,7 +146,7 @@ as most of the time it is stalling on memory latency.
 Memory level parallelism is a CPU feature available on most of the 21st-century CPUs 
 that allows fetching multiple independent DRAM addresses to CPU cache in parallel. 
 By allowing the CPU to read multiple addresses in one DRAM roundtrip,
-memory level parallelism has the potential to speed up those memory-latency bounded workloads.
+memory level parallelism has the potential to speed up those memory latency bounded workloads.
 
 However, most of the prior research on optimizing indexing workloads via memory level parallelism 
 are based on software pipelining technique \cite{hashjoin_icde04, fast_sigmod10, amac_vldb15, operatorfusion_vldb17, cimple_pact18}, 
@@ -160,8 +160,7 @@ and provide identical APIs as their conventional counterparts.
 In this report, we present two MLP-grounded data structure -- a lock-free skiplist iterator 
 and an ordered index. 
 While maintaining identical APIs as their conventional counterparts, 
-they achieve the performance not considered possible before, 
-typically a few times faster than the current state-of-the-arts. 
+they are up to 4x faster than the current state-of-the-art data structures. 
 
 \end{abstract}
 
@@ -176,30 +175,29 @@ typically a few times faster than the current state-of-the-arts.
 \subsection{Background of Memory Level Parallelism}
 
 As CPU microarchitecture design continues to evolve, more and more features have been introduced 
-to modern CPU for better performance. Some of the features, such as SIMD instructions, 
+to modern CPUs for better performance. Some of the features, such as SIMD instructions, 
 are supposed to be explicitly used by software, while others, such as out-of-order execution 
 and advanced branch predictor, are designed as transparent optimizations that require no 
 software-level cooperation.
 
 Memory level parallelism is a feature that falls in between. 
 It takes only a fraction of a nanosecond to execute a CPU instruction; 
-but reading a position in the main memory takes at least 70ns even on the latest DRAM chip.
+but reading a data value from the main memory takes at least 70ns even on the latest DRAM chip.
 While the CPU cache is supposed to hide this latency, few accesses will hit the cache if the access pattern lacks locality.
 Memory level parallelism was introduced in Intel CPU \textit{Pentium 4} in 2000 
 to address the huge discrepancy between DRAM latency and CPU clockrate.
-This CPU introduces a hardware (the ``hardware prefetcher'') to predict the DRAM addresses that will be needed in the near future, 
+This CPU introduced hardware (the ``hardware prefetcher'') to predict the DRAM addresses that will be needed in the near future, 
 by either speculative execution of the instruction stream, 
 or heuristics based on patterns of recently-fetched DRAM addresses, 
 and fetches those addresses to the CPU cache in parallel to the CPU execution.
 This effectively allows the CPU to read multiple DRAM positions in parallel, hence the name.
-Most Intel CPUs can track up to 10 outstanding DRAM accesses in parallel, 
-with 12 for the latest CPU \textit{Skylake} \cite{IntelOptGuide}.
+Most Intel CPUs can track up to 10 outstanding DRAM accesses in parallel \cite{IntelOptGuide}.
 While there is no official documentation for AMD CPUs, 
 experiment shows the latest AMD CPU \textit{Epyc} can track at least 16 DRAM accesses. 
 Programmers may also use a special ``software prefetch'' instruction to
 explicitly advise the CPU to fetch an address into the cache.
 
-A large class of indexing and graph analytics applications are memory latency bounded: 
+A large class of indexing and graph analytics applications are memory latency bound: 
 while the DRAM chip could support a high bandwidth, 
 the CPU is only able to effectively use a small portion of the bandwidth, 
 as most of the time it is stalling on memory latency.
@@ -208,7 +206,7 @@ in most of such applications, if no proper software guidance is provided,
 the hardware prefetcher has very limited (actually in a lot of scenarios, zero)
 capability to leverage those wasted bandwidth by prefetching useful data into the cache. 
 By effectively leveraging memory level parallelism, 
-we could in theory allow the CPU to perform 10x or more DRAM random accesses 
+we could in theory allow the CPU to perform up to 10x (and even more for AMD CPUs) DRAM random accesses 
 in the same amount of time. Therefore, memory level parallelism has huge potential to speed up those applications.
 
 Unfortunately, despite that indexing workloads are largely bounded by memory latency, 
@@ -218,7 +216,7 @@ Despite that memory level parallelism also provided a programmer-usable interfac
 there is not much prior work in utilizing memory level parallelism for better performance on indexing workloads. 
 We summarize the prior works as well as their limitations in Section \ref{relwork}.
 
-\subsection{Prior Works and Their Limitations} \label{relwork}
+\subsection{Prior Work and Their Limitations} \label{relwork}
 
 % In this section, we briefly summarize prior works on utilizing memory level parallelism and their limitations.
 
@@ -284,7 +282,7 @@ This fundamental limitation,
 as well as the practical difficulty to implement and maintain a software pipeline, 
 may explain why software pipelining is rarely used in real world.
 
-\subsection{Our Contribution}
+\subsection{Our Contributions}
 
 We take a completely different approach. 
 Instead of sticking to traditional data structures 
@@ -353,8 +351,9 @@ The experiment is performed on a few different hardware settings,
 including an Intel-CPU personal laptop (\textit{Skylake}, DDR4), 
 an Intel-CPU multi-socket server (\textit{Haswell}, DDR4), and an AMD-CPU multi-socket server (\textit{Epyc}, DDR4).
 However, the results are similar with only quantitative difference, 
-so we will only present the results measured on the personal laptop.
-The hardware setting is Intel Core i7-7700HQ CPU at 2.80GHz and 1x16GB Corsair DDR4 2400MT DRAM.
+so we will only present in graph the results measured on the personal laptop, 
+and mention the quantitative difference on other hardware settings in text.
+The personal laptop's hardware setting is Intel Core i7-7700HQ CPU at 2.80GHz and 1x16GB Corsair DDR4 2400MT DRAM.
  
 \subsection{Speculative Execution, and Stopping Speculative Execution} \label{specexec}
 We first review the CPU memory level parallelism mechanism mentioned in Section \ref{introduction}.
@@ -486,6 +485,7 @@ As a side note, one can easily extend this technique to mimic any data dependenc
 %the CPU speculative execution can often perform well without software guidance). 
 
 Figure \ref{mlprealworld} illustrates results for different $K$, ranging from $1$ (serial access) to $120$. 
+Note that 1GB huge page is used in the experiment, see Section \ref{misctricks} for further discussion on huge pages.
 
 \begin{figure}[!htb]
 \minipage{0.50\textwidth}
@@ -502,8 +502,6 @@ Right: the equivalent memory level parallelism degree one can reach by issuing d
 Colors: different sizes of array $arr$.}
 \label{mlprealworld}
 \end{figure}
-
-Note that 1GB huge page is used in the experiment, see Section \ref{misctricks} for further discussion on huge pages.
 
 As shown in Figure \ref{mlprealworld}, the time it takes to perform $K$ independent accesses in parallel 
 is pretty much linear with respect to $K$. 
@@ -603,7 +601,7 @@ given a range on the index key, one wants to iterate through every item which in
 There are often at least hundreds of items falling in the specified range.
 In that case, iterating through every item in the range will take the majority of the time, 
 compared with the $O(\log n)$ time to find the boundary nodes corresponding to the ranges.
-The nature of skiplist decided that every iteration will be a cache miss.
+Unless the keys are inserted in increasing order, it is clear that every iteration will be a cache miss.
 
 In this section, we describe how to speed up this iteration process. 
 Our iterator provides the identical API as the plain iterator 
@@ -828,6 +826,8 @@ However, we are advantageous as long as the range contains at least around 20 it
 
 In this section, we demonstrate the performance impact of our iterator in MemSQL \cite{memsql}, 
 a commercial main memory database.
+The benchmark is run on the personal laptop, 
+with hardware setting Intel Core i7-7700HQ CPU at 2.80GHz and 1x16GB Corsair DDR4 2400MT DRAM.
 
 MemSQL uses a versioned lock-free skiplist as their in-memory index, with each node represent a row of data. 
 Versioning is necessary to support snapshot isolation.
@@ -877,17 +877,15 @@ We also tested the case of 4/8 concurrent query threads working on 2/4 available
 the results are in Table \ref{sliter_memsql_mt}. As one can see, we achieve 1.54x to 1.93x speedup in multi-threaded cases.
  
  \begin{table}[!htb]
-   \begin{tabular}{|c|l|l|}
-   \hline
-Query Threads & \multicolumn{1}{c|}{4}                                                            & \multicolumn{1}{c|}{8}                                                            \\
-MemSQL CPU    &                                                                                  &                                                                                  \\
+ \centering
+\begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
-4          & 19.8M vs 30.5M (+54\%) & 16.8M vs 27.7M (+65\%) \\
-\hline
-2         & 12.0M vs 23.2M (+93\%) & 12.8M vs 20.9M (+63\%) \\
-\hline
+\# Query Threads & \multicolumn{3}{c|}{2 Threads}              & \multicolumn{3}{c|}{4 Threads}              \\ \hline
+\# CPUs for MemSQL       & Before      & After       & Speedup & Before      & After       & Speedup \\ \hline
+2 CPUs & 19.8 & 30.5 & 54\%    & 16.8 & 27.7 & 65\%    \\ \hline
+4 CPUs & 12.0 & 23.2 & 93\%    & 12.8 & 20.9 & 63\%    \\ \hline
 \end{tabular}
-\caption{Throughput for multi-threaded cases, in form of Original vs Ours (Speedup Percentage).}
+\caption{Total throughput for multi-threaded cases in million rows per second.}
 \label{sliter_memsql_mt}
 \end{table}
 
@@ -1590,6 +1588,7 @@ a hash function family widely used in industry that is both extremely preferment
 \subsection{Evaluation} \label{mlpindex_eval}
 
 In this section, we benchmark $\MlpIndex$ on 64-bit keys against other state-of-the-art data structures. 
+The hardware setting is Intel Core i7-7700HQ CPU at 2.80GHz and 2x16GB Corsair DDR4 2400MT DRAM.
 
 \subsubsection*{Benchmark Rivals}
 
@@ -1875,7 +1874,7 @@ std::set                                                                     & 0
 \label{mlpindex_results}
 \end{table}
 
-\section{Future Works} \label{futureworks}
+\section{Future Work} \label{futureworks}
 
 In this section, we briefly mention a few possible directions of future works. 
 

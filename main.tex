@@ -272,7 +272,7 @@ However, there is one fundamental limitation of software pipelining technique.
 Software pipelining can only support batched-read-only workloads. 
 It is impossible to support non-batched workloads (e.g. the next query may be dependent on the answer to the previous one), 
 since the nature of software pipeline requires a batch of queries to expose memory level parallelism. 
-It is also extremely hard, if not impossible, to support mixed workloads or even insert-only workloads in general, 
+It is also extremely hard to support mixed workloads or even insert-only workloads in general, 
 due to read-write and write-write hazards similar to one would encounter in a multi-threading environment.
 Since a batch of reads and writes are executed in a interleaved manner in the pipeline,
 a read may observe a logically earlier but not-yet-completed write in the pipeline, 
@@ -900,8 +900,9 @@ As shown in Section \ref{misctricks}, this has a negative impact on the performa
 
 \section{Ordered Index} \label{orderedindex}
 
-In this section, we present $\MlpIndex$, an ordered index structure that supports identical APIs as std::set.
-Specifically, it supports $\insertion$ (insert an element into the set), $\lookup$ (query if an element exists in the set) 
+In this section, we present $\MlpIndex$, an ordered index structure analogous to std::set.
+Specifically, it supports three operations with identical APIs as std::set, namely
+$\insertion$ (insert an element into the set), $\lookup$ (query if an element exists in the set) 
 and $\lowerbound$ (find the minimum element in the set no smaller than the given element).
 $\MlpIndex$ is not a comparison-based data structure, but an integer data structure that operates on a key universe $[0,M)$.
 While our implementation currently only supports 64-bit keys ($M=2^{64}$), it could be extended to support any string keys as well.
@@ -938,9 +939,9 @@ depending on the lookup results.
 $\insertion$ only writes to cache-resident addresses after the lookup 
 if there is no hash table movement due to conflict.
 
-$\MlpIndex$ is also optimal from a complexity theory view: as proven in \cite{ajtai88comb-lowerbound}, 
+$\MlpIndex$ is also optimal from a complexity theoretical view: as proven in \cite{ajtai88comb-lowerbound}, 
 under word-RAM model and plausible assumptions on the size of the data structure, 
-$O(\log \log M)$ per operation is the lower bound in time to support both $\insertion$ and $\lowerbound$ operation. 
+$\Omega(\log \log M)$ per operation is the lower bound in time to support both $\insertion$ and $\lowerbound$ operation. 
 
 For use cases that requires both $\lookup$ and $\lowerbound$, 
 a common strategy is to build a stand-alone hash table to support $O(1)$ $\lookup$, 
@@ -1008,7 +1009,7 @@ struct Node {
 \end{minted}
 \end{codebox}\doublespacing
 
-Those information are dynamically updated using the information stored in its 0/1 children, 
+Those information is dynamically updated using the information stored in its 0/1 children, 
 for example, if one of the children of node $n$ is modified, one can update n\verb|->|min
 using the logic described in the following straight-forward pseudocode:
 
@@ -1123,7 +1124,7 @@ and reduces memory consumption of the data structure from $O(n\cdot\log M)$ to $
 \subsubsection*{Using $D$-ary search}
 
 In x-fast trie, we use a binary search to find the LCP between a given key and the set of keys in the data structure.
-While theoretically optimal, it did not make use of memory level parallelism, 
+While theoretically optimal, it does not make use of memory level parallelism, 
 since we could not know if the answer is falling in the left half or the right half of the interval, 
 until the current query is complete. 
 A natural modification is to use $D$-ary search instead. 
@@ -1149,11 +1150,13 @@ and $a$ is removed due to path compression.
 Then one will see that prefix length $0,2$ exists in the hash table, 
 but $1,3$ does not. Binary search no longer works.
 
-So we have to do an ``incomplete'' path compression. 
+To build up our intuition, we will start with an incomplete solution.
+A straightforward way to workaround the unwanted interaction between path-compression and binary search
+is to do an ``incomplete'' path compression instead. 
 When we insert a new node at depth $k$,
-for each $D$-ary search depth $d$,
-we must create a intermediate node at the largest depth smaller than $k$ that search $d$ will check, 
-so that the search can narrow down correctly without missing the new node. 
+we want to make sure that the $D$-ary search can narrow down correctly in each step to not miss the new node.
+Therefore, for each $D$-ary search depth $d$, 
+we create a intermediate node at the largest depth smaller than $k$ that search $d$ will check.
 Since the $D$-ary search takes $\log_D\log M$ steps to complete, 
 now we need to create at most $O(\log_D\log M)$ intermediate nodes for each new node inserted, 
 so the trie may contain at most $O(n\cdot \log_D\log M)$ nodes. 
@@ -1174,15 +1177,18 @@ it will potentially be checked (the unlabeled nodes are potentially checked in 4
 \label{intermediate_nodes}
 \end{figure}
 
-While the above point-of-view explains the memory consumption straightforwardly, 
-it may be easier to understand the algorithm conceptually 
-by looking at an equivalent algorithm built in a recursive way. 
-We build a path-compressed trie tree of depth $D$, with each node has a fan-out of $2^{(\log M)/D}$, 
-and the same data structure is used recursively to maintain the list of children of each node.
+However, the tree resulted from the above approach can still have height $\log M$ in worst case.
+Since $\insertion$ may update all the extra-information fields along the path, 
+it would still result in a $\insertion$ cost of $O(\log M)$.
+
+The solution is to employ a recursive approach. 
+We build a path-compressed trie tree of depth $D$, with each node has a fan-out of $M^{1/D}$, 
+so the children of a node will be values in $[0, M^{1/D})$.
+We use the same data structure recursively to maintain the list of children of each node.
 The special case is the root node with only one child -- 
 this correspond to the ``intermediate'' nodes due to incomplete path compression, which only has one child. 
-We should not create further intermediate nodes for those intermediate nodes, 
-so we need to treat them specially -- since it can only happen on the root node, 
+In order to achieve the memory complexity of $O(n\log_D\log M)$, 
+we need to treat them specially -- since it can only happen on the root node, 
 we can just store the key directly in that case. 
 
 Note that in practice, we do not necessarily use the same data structure recursively to manage the children of a node. 
@@ -1417,8 +1423,8 @@ we focus our examples on 64-bit key case, which is the case that we benchmark in
 
 \subsubsection*{Cuckoo Hashing}
 
-The bottleneck of $\MlpIndex$ is the parallel hash table lookups, 
-specifically, the longest probe chain of the $D$ parallel lookups determined the number 
+The bottleneck of $\MlpIndex$ is the parallel hash table lookups.
+Specifically, the longest probe chain of the $D$ parallel lookups determines the number 
 of DRAM roundtrips needed to complete this query. 
 So we want a hash table that not only optimizes the average, but also the variance of a lookup. 
 Cuckoo hashing \cite{cuckoohash} turns out to be the ideal choice that achieves both goals. 
@@ -1431,7 +1437,7 @@ However one can improve to a load factor of 90\%+ with bucketized cuckoo \cite{b
 Due to time limitation, we are unable to implement the bucketized cuckoo fully for $\MlpIndex$. 
 However, we implemented the out-of-box experiment that 
 demonstrated the memory consumption we can achieve with a modified bucketized cuckoo, 
-which we will discuss in paragraph \ref{variantsizehash}.
+which we will discuss in the ``Bucketized Cuckoo Hashing'' paragraph in this section.
 
 \subsubsection*{Lowest Level Bitmap} \label{lowestlevelbitmap}
 
@@ -1567,7 +1573,7 @@ into $\MlpIndex$. All evaluations in Section \ref{mlpindex_eval} are done using 
 \subsubsection*{Flat Bitmap For Top Layers of Trie Tree}
 
 This is an extra optimization for 64-bit keys.
-The top 3 layers of the trie tree can only hold $256^3$ different values. 
+The top two layers of the trie tree can only hold $256^3$ different children. 
 It would additionally save some space, as well as DRAM accesses, to simply store the first 2 layers
 in a flat array, each using a bitmap of 256 bits (32 bytes) to store which children exists. 
 This results in a bitmap of $256^2\times 32$ bytes ($2MB$), instead of the hash table. 

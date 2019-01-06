@@ -4,8 +4,7 @@ a CPU hardware feature available on most of the modern CPUs manufactured after 2
 [pdf here](https://github.com/sillycross/efficient-mlp/blob/master/main.pdf)
 
 In this report, we demostrated that by leveraging memory level parallelism, 
-one can design data structures that achieve the performance not considered possible before, 
-typically a few times faster than the current state-of-the-arts. 
+one can design data structures that is up to 4x faster than the current state-of-the-art.
 
 We present two novel "MLP-grounded" data structures:
 * A lock-free skiplist iterator

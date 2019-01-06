@@ -143,8 +143,8 @@ while the DRAM chip could support a high bandwidth,
 the CPU is only able to effectively use a small portion of the bandwidth, 
 as most of the time it is stalling on memory latency.
 
-Memory level parallelism is a CPU feature available on most of the 21-century CPUs 
-that supports fetching multiple independent DRAM addresses to CPU cache in parallel. 
+Memory level parallelism is a CPU feature available on most of the 21st-century CPUs 
+that allows fetching multiple independent DRAM addresses to CPU cache in parallel. 
 By allowing the CPU to read multiple addresses in one DRAM roundtrip,
 memory level parallelism has the potential to speed up those memory-latency bounded workloads.
 
@@ -205,7 +205,7 @@ the CPU is only able to effectively use a small portion of the bandwidth,
 as most of the time it is stalling on memory latency.
 And as we will show in later sections, 
 in most of such applications, if no proper software guidance is provided, 
-the hardware prefetcher has very limited (actually in a lot of scenerios, zero)
+the hardware prefetcher has very limited (actually in a lot of scenarios, zero)
 capability to leverage those wasted bandwidth by prefetching useful data into the cache. 
 By effectively leveraging memory level parallelism, 
 we could in theory allow the CPU to perform 10x or more DRAM random accesses 
@@ -236,12 +236,12 @@ and prefetches the DRAM addresses that will be used in phase $k+1$.
 There is one outstanding prefetch for each query at any time, 
 and those prefetches will be executed in parallel thanks to CPU memory level parallelism capability.
 
-As far as we are aware of, all existing methods to leverage MLP are based on the abovementioned ``software pipelining'' technique.
-This technique can be used to support batched-read operations on static data set, for a number of widely used data structures, 
+As far as we are aware of, all existing methods to leverage MLP are based on the above-mentioned ``software pipelining'' technique.
+This technique can be used to optimize batched-read operations on a static data set, for a number of widely used data structures, 
 including hash table, binary search, binary search tree, skiplist and B-tree, as shown in \cite{cimple_pact18, fast_sigmod10}.
-The authors of \cite{cimple_pact18} demostrated that the technique delievers up to 6.4x single-thread speedup, 
+The authors of \cite{cimple_pact18} demonstrated that the technique delivers up to 6.4x single-thread speedup, 
 and 2.5x total throughput when running on all cores. 
-The authors of \cite{fast_sigmod10} demostrated 50M peak throughput 
+The authors of \cite{fast_sigmod10} demonstrated 50M peak throughput 
 on a quad-core Intel Core i7 CPU for B-tree lookup on 32-bit integer keys.
 
 AMAC \cite{amac_vldb15} is an improvement to the software pipeline technique 
@@ -254,9 +254,9 @@ which makes sure that a high MLP is always exposed to the CPU.
 \cite{operatorfusion_vldb17} applied the software pipelining technique to a wider range of database operations. 
 Specifically, it decomposes the procedure of executing a query into stages, 
 where each stage only performs operations on cache-resident data and prefetches. 
-To gaurantee that there is always a high degree of memory level parallelism, the outputs of a stage are temporarily buffered. 
+To guarantee that there is always a high degree of memory level parallelism, the outputs of a stage are temporarily buffered. 
 They are not sent to the next stage until a full vector of outputs (the batch) has been generated from the inputs, 
-which gaurantees that each stage can always operate on a full batch of inputs.
+which guarantees that each stage can always operate on a full batch of inputs.
 
 In practice implementing a software pipeline correctly and efficiently 
 often requires significant labor work, as well as extensive change to the application logic, 
@@ -267,7 +267,7 @@ designing a Domain Specific Language called $\Cimple$ that generates and manages
 via a coroutine technique. 
 In $\Cimple$, all one needs to do is to annotate
 DRAM accesses in the code that are supposed to be cache-missing.
-The authors demostrated that the automatically generated software pipelines via $\Cimple$ have comparable performance as the hand-written ones, 
+The authors demonstrated that the automatically generated software pipelines via $\Cimple$ have comparable performance as the hand-written ones, 
 on a variety of well-known data structures.
 
 However, there is one fundamental limitation of software pipelining technique. 
@@ -303,7 +303,7 @@ A good analogy of how our data structures are grounded on memory level paralleli
 is how B-tree is grounded on blocked disk reads. 
 Despite that a B-tree might not read less bytes than a conventional binary search tree, 
 B-tree operates faster since disk reads are done in blocks. 
-Similarily, we might not read less locations from the memory than a conventional data structure does, 
+Similarly, we might not read less locations from the memory than a conventional data structure does, 
 nonetheless we are much faster, because we are reading those locations in parallel.
 This ``ground-up'' approach turns out to be fruitful. 
 First, by designing data structures from ground up, 
@@ -326,12 +326,12 @@ They both have identical APIs as their traditional counterparts.
 In Section \ref{sliter}, we present how to speed up lock-free skiplist iteration via memory level parallelism. 
 We employed our technique in MemSQL \cite{memsql},
 a commercial main-memory database that uses lock-free skiplist \cite{lockfree_skiplist} as their index data structure \cite{memsqladamblog}, 
-and demostrated that our technique achieves up to 1.9x single-threaded end-to-end query time speedup, and 1.5x to 1.9x
+and demonstrated that our technique achieves up to 1.9x single-threaded end-to-end query time speedup, and 1.5x to 1.9x
 total throughput when running on all cores.
 In Section \ref{orderedindex}, we present $\MlpIndex$, an ordered index for 64-bit integers 
 (and can be extended to support short strings), 
 inspired by x-fast trie \cite{xfast}, but re-designed from ground up to leverage memory level parallelism. 
-We demostrate that it can execute an $\insertion$ or $\lookup$ operation in time equivalent to around 2 DRAM roundtrips, 
+We demonstrate that it can execute an $\insertion$ or $\lookup$ operation in time equivalent to around 2 DRAM roundtrips, 
 and an $\lowerbound$ operation in time equivalent to around 3 DRAM roundtrips. 
 Compared with HOT \cite{hot_sigmod18}, the fastest state-of-the-art ordered index structure to the best of our knowledge, 
 we are 3 to 4 times faster on $\insertion$ and $\lookup$, and 2x faster on $\lowerbound$.
@@ -352,7 +352,7 @@ In this section, we measure the effect of memory level parallelism in real world
 The experiment is performed on a few different hardware settings, 
 including an Intel-CPU personal laptop (\textit{Skylake}, DDR4), 
 an Intel-CPU multi-socket server (\textit{Haswell}, DDR4), and an AMD-CPU multi-socket server (\textit{Epyc}, DDR4).
-However, the results are similar with only quantative difference, 
+However, the results are similar with only quantitative difference, 
 so we will only present the results measured on the personal laptop.
 The hardware setting is Intel Core i7-7700HQ CPU at 2.80GHz and 1x16GB Corsair DDR4 2400MT DRAM.
  
@@ -528,7 +528,7 @@ into the CPU cache.
 To measure the effect of adjacent-line prefetcher, one needs to construct a code snippet 
 that accesses the adjacent line of a previously accessed line. 
 However, one must ``hide'' the address of that access from speculative execution mechanism, 
-to make sure that we are measureing the effect of hardware prefetcher, not speculative execution. 
+to make sure that we are measuring the effect of hardware prefetcher, not speculative execution. 
 This can be done via the following trick: 
 access a few (say 8) random cache lines first, and accumulates the results. 
 We then access the adjacent cache line of the $k$-th access, where $k$ is the residue of the accumulator modulo 8. 
@@ -612,12 +612,12 @@ and plain pointer dereference to access the current node.
 This makes us a drop-in replacement of the plain iterator for higher-level applications.
 In Section \ref{sliter_singlethread}, 
 we elaborate the idea on a single-threaded skiplist, 
-and demostrate a 4x speed-up. 
+and demonstrate a 4x speed-up. 
 In Section \ref{sliter_memsql}, 
 we extend our iterator to support lock-free versioned skiplist, 
 and integrated our iterator into MemSQL \cite{memsql}, a commercial main memory database, 
 and evaluated the performance impact on real SQL queries. 
-We demostrated that our iterator results in 1.9x end-to-end query time speedup when there is only one query thread. 
+We demonstrated that our iterator results in 1.9x end-to-end query time speedup when there is only one query thread. 
 With multiple query threads, we still achieve 1.5x to 1.9x speedup.
 
 \subsection{Single-threaded Skiplist Case} \label{sliter_singlethread}
@@ -641,10 +641,10 @@ and there are expected $O(1)$ items in the next layer between two adjacent nodes
 This allows one to answer a $\lowerbound$ query in expected $O(\log n)$ time by traversing from the start of top layer, 
 moving along the linked list as long as the next node is smaller than the given bound, 
 and moving down to the next layer when the condition is not satisfied. 
-After the two boundary nodes corresponding to the specifed range are found, 
+After the two boundary nodes corresponding to the specified range are found, 
 iterating through every node in this range is no different from iterating a linked-list: 
 one simply traverse along the bottom-most layer starting from the left boundary node, until the right boundary node is reached.
-While the data structure is very straight-forward, for clearity, 
+While the data structure is very straight-forward, for clarity, 
 we still provide the prototype of the skiplist as well as a plain iterator:
 
 \singlespacing\begin{codebox}
@@ -713,7 +713,7 @@ We will have a queue of ``prefetch tasks'', each described by a triplet $(start,
 The triplet means that $start$ has been prefetched to cache (so accessing $start$.next[] will not be cache-missing), 
 we want to prefetch everything between $start$ and $end$,
 and the highest layer linked-list that connects $start$ and $end$ is $level$. 
-To process such a task while maintaining the invariance, we will: 
+To process such a task while maintaining the invariant, we will: 
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
 \item Prefetch $start$.next[$i$] for each $0\leq i\leq level$.
@@ -762,7 +762,7 @@ Analyzing the code above, it is not hard to see that for a task with level $k$,
 it will be fully ``digested'' in $k$ steps, 
 while producing on expectation $C_k^i$ non-empty ($start\neq end$) items in the $i^{th}$ step. 
 So if we push a new level $K$ task into the queue in every phase, 
-the queue will stablize at expected $1+\sum_{i=1}^K C_K^i=2^K$ items, 
+the queue will stabilize at expected $1+\sum_{i=1}^K C_K^i=2^K$ items, 
 with expected $2^K$ useful prefetches issued in parallel in each phase.
 This allows us to reach an arbitrary degree of memory level parallelism in theory by picking a large enough $K$.
 In practice, $K=3$ or $4$ yields the best results, 
@@ -822,11 +822,11 @@ Since our iterator has a ramp-up cost (we need to find a node with at least towe
 and for the first few phases our queue is not having the full expected size thus less MLP, 
 and for the last few phases we may prefetch items that are outside range), 
 for short iterations our advantage is smaller. 
-However, we are advantagous as long as the range contains at least around 20 items.
+However, we are advantageous as long as the range contains at least around 20 items.
 
 \subsection{Evaluation in MemSQL, a Real World Database} \label{sliter_memsql}
 
-In this section, we demostrate the performance impact of our iterator in MemSQL \cite{memsql}, 
+In this section, we demonstrate the performance impact of our iterator in MemSQL \cite{memsql}, 
 a commercial main memory database.
 
 MemSQL uses a versioned lock-free skiplist as their in-memory index, with each node represent a row of data. 
@@ -840,7 +840,7 @@ As such, it is plausible to assume that most of the time the version linked-list
 so we only prefetch the head of the linked list and not the deeper nodes. 
 
 Lock-freedom is generally not a problem for us: 
-lockfree skiplist implementation gaurantees that 
+lockfree skiplist implementation guarantees that 
 at any point each layer is always a valid linked list even in the presence of deletes, 
 and the memory are reclaimed using epochs, 
 so the references we hold will also remain valid all the time. 
@@ -893,7 +893,7 @@ MemSQL CPU    &                                                                 
 
 The reason that the speedup is smaller compared with the single-threaded case may come from a few factors. 
 First, the versioned lock-free skiplist contains significantly more logic than the single-threaded skiplist. 
-We cannot speed up those logics, and furthermore, some of the logics contain DRAM access (for example, 
+We cannot speed up those logic, and furthermore, some of the logic contain DRAM access (for example, 
 reading the version linked-list), which consumes some of the fixed hardware-available memory parallelism degree. 
 Second, versioned lock-free skiplist contains a lot of memory barriers. 
 Those barriers could require flushing the CPU load/store queues, which limits the memory level parallelism. 
@@ -915,7 +915,7 @@ Under the assumption that $D$ independent parallel DRAM requests where each requ
 $\MlpIndex$ takes $O(\log_D\log M)$ DRAM roundtrips (which is the dominating factor of time in practice) 
 and $O(D\cdot\log_D\log M)$ CPU work to execute an $\insertion$, $\lookup$ or $\lowerbound$,
 and has a memory consumption of $O(n\cdot \log_D\log M)$.
-If we have SIMD support on $D$-vectorized operations (specifically, arithimetic and $\simdgather$ / $\simdscatter$ operation), 
+If we have SIMD support on $D$-vectorized operations (specifically, arithmetic and $\simdgather$/$\simdscatter$ operation), 
 the CPU work could be reduced to $O(\log_D\log M)$ as well.
 
 To the best of our knowledge, $\MlpIndex$ is practically the fastest ordered index. 
@@ -923,7 +923,7 @@ Compared with Height Optimized Trie (HOT) \cite{hot_sigmod18},
 the fastest state-of-the-art ordered index we are aware of, 
 $\MlpIndex$ is 3x to 4x faster on $\insertion$ and $\lookup$, 
 and 2x faster on $\lowerbound$.
-Compared with Adaptively Radix Tree (ART) \cite{arttrie_icde13}, $\MlpIndex$ is 4x to 4.5x faster. 
+Compared with Adaptive Radix Tree (ART) \cite{arttrie_icde13}, $\MlpIndex$ is 4x to 4.5x faster. 
 On a data set of 80 million 64-bit keys, single-threaded $\MlpIndex$ only takes around 2 DRAM roundtrip time to perform 
 an $\insertion$ or $\lookup$, and around 3 DRAM roundtrip time to perform an $\lowerbound$.
 We note that since the data set cannot fit into cache, 
@@ -982,7 +982,7 @@ and in Section \ref{mlpindex_eval} we benchmark the performance against a few st
 \subsection{Original x-fast Trie Idea} \label{intro_xfast}
 
 X-fast trie assumes that all keys have a length of $\log M$ bits.
-In its essense, a x-fast trie is a plain binary trie that carries a few extra information on the node:
+In its essence, a x-fast trie is a plain binary trie that carries a few extra information on the node:
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
 \item Prefix: the prefix that this node represents in the trie.
@@ -1165,7 +1165,7 @@ We need to make sure that $D$-ary search will be able to find the new node.
 The $D$-ary search will check the nodes labeled ``1'' first. 
 In order for the search to not miss our red node, we need to materialize the ``1'' node before to our newly inserted node. 
 Then the search will check the two nodes labeled ``2'' in second phase, and the last two nodes labeled ``3'' in third phase,
-so similarily we need to materialize the ``2'' and ``3'' node before our newly inserted node (the green nodes).
+so similarity we need to materialize the ``2'' and ``3'' node before our newly inserted node (the green nodes).
 
 \begin{figure}[!htb]
   \includegraphics[width=\linewidth]{intermediate_nodes.png}
@@ -1179,7 +1179,7 @@ it will potentially be checked (the unlabeled nodes are potentially checked in 4
 While the above point-of-view explains the memory consumption straightforwardly, 
 it may be easier to understand the algorithm conceptually 
 by looking at an equivalent algorithm built in a recursive way. 
-We build a path-compressed trie tree of depth $D$, with each node has a fanout of $2^{(\log M)/D}$, 
+We build a path-compressed trie tree of depth $D$, with each node has a fan-out of $2^{(\log M)/D}$, 
 and the same data structure is used recursively to maintain the list of children of each node.
 The special case is the root node with only one child -- 
 this correspond to the ``intermediate'' nodes due to incomplete path compression, which only has one child. 
@@ -1190,7 +1190,7 @@ we can just store the key directly in that case.
 Note that in practice, we do not necessarily use the same data structure recursively to manage the children of a node. 
 We can use different structures according to the size of the key universe. 
 Specifically, in 64-bit key case, we have $D=8$ trie tree as outer-level data structure 
-that results in a node fanout of 256. 
+that results in a node fan-out of 256. 
 The trie tree turns out to be too heavy-weighted to be used as the inner-level structure, 
 since the key universe has a size of only 256.
 We use either a list of children (if the number of children is small) 
@@ -1357,7 +1357,7 @@ Key Lower_Bound(Node* root, Key x) {
         // If path-compression string does not match
         isAllSmallerThanKey = (n->fullKey < x[0:fullKeyLen]);
     } else {
-        // path-compressions string matches, 
+        // path-compression string matches, 
         // then n being LCP node implies that all children 
         // must start with bit k, and x starts with bit 1-k
         isAllSmallerThanKey = (x[fullKeyLen] == 1);
@@ -1432,7 +1432,7 @@ The original cuckoo hashing scheme allows a maximum load factor of 50\%.
 However one can improve to a load factor of 90\%+ with bucketized cuckoo \cite{bucketcuckoo}. 
 Due to time limitation, we are unable to implement the bucketized cuckoo fully for $\MlpIndex$. 
 However, we implemented the out-of-box experiment that 
-demostrated the memory consumption we can achieve with a modified bucketized cuckoo, 
+demonstrated the memory consumption we can achieve with a modified bucketized cuckoo, 
 which we will discuss in paragraph \ref{variantsizehash}.
 
 \subsubsection*{Lowest Level Bitmap} \label{lowestlevelbitmap}
@@ -1452,14 +1452,14 @@ This trick allows us to work completely on cache-resident data when querying the
 so we effectively reduced the time by a factor of two for 64-bit case.
 
 After applying this optimization, the $\MlpIndex$ structure for 64-bit keys is effectively 
-a path-compressed trie tree of fanout 256, with a 256-bit-long bitmap in each node to denote whether a child exists. 
+a path-compressed trie tree of fan-out 256, with a 256-bit-long bitmap in each node to denote whether a child exists. 
 To find the $\lowerbound$ of a given key $x$, we first find the LCP node $n$ and LCP length $k$ (in bytes) in the trie 
 by lookup the 8 prefixes of $x$ in the hash tables. 
 Then, we find the lower bound of $x[k]$ amongst the children of $n$ in the bitmap. 
 If the lower bound exists, the answer is just the minimum element stored in the corresponding subtree.
 If not, we may move back to the parent of $n$ and repeat. 
 This allows us to remove the leaf-links (as well as ``max'' field if one does not need to support $\upperbound$) to save more memory. 
-And actually we did not sacrifice performance, since moving along the leaf-link results in a costy cache miss, 
+And actually we did not sacrifice performance, since moving along the leaf-link results in a costly cache miss, 
 but the above algorithm operates on cache-resident data all the time, and most of the time in practice 
 we don't have to move along the parent path for more than a few steps.
 
@@ -1467,7 +1467,7 @@ we don't have to move along the parent path for more than a few steps.
 
 A 8-bit-children bitmap takes 32 bytes to store, which is still kind of a waste if there are only a few children. 
 We employ the ``adaptive sized node'' idea from \cite{arttrie_icde13} to further reduce memory. 
-We demostrate how this works on 64-bit keys as an example. 
+We demonstrate how this works on 64-bit keys as an example. 
 
 Recall that the necessary information of a node includes the prefix (index) that this node represents in the trie, 
 the path-compressed string between this node and its parent, and the minimum value stored in this node's subtree, 
@@ -1520,7 +1520,7 @@ The tricky thing is, how could we arrange nodes of different sizes in the same h
 Using pointer indirection is not a solution, since we don't want to incur additional cache miss. 
 Another good property of cuckoo hashing comes in: 
 unlike other closed-addressing schemes that may have ``clusters'' of occupied slots, 
-the possibility of each slot is occupied in cuckoo hash table is indepedent, 
+the possibility of each slot is occupied in cuckoo hash table is independent, 
 and simply equals the load factor. 
 So we can ``steal'' an unused slot from the neighborhood of the slot for the ``big node'' to form a 48-byte node. 
 That unused slot should reside in the same 128-byte line,
@@ -1585,7 +1585,7 @@ vectorizable (since we need to compute multiple independent strings' hash value)
 and have high quality (required for cuckoo hash scheme to reach its theoretical maximum load factor).
 While there may definitely be other choices that meet the criteria, 
 we chose xxHash \cite{xxhash}, 
-a hash function family widely used in industry that is both extremely performant and of high quality.
+a hash function family widely used in industry that is both extremely preferment and of high quality.
 
 \subsection{Evaluation} \label{mlpindex_eval}
 
@@ -1596,9 +1596,10 @@ In this section, we benchmark $\MlpIndex$ on 64-bit keys against other state-of-
 We benchmarked $\MlpIndex$ against two fastest ordered index 
 structures to the best of our knowledge -- the Height Optimized Trie (HOT) \cite{hot_sigmod18} and the Adaptive Radix Tree (ART) \cite{arttrie_icde13}.
 We also benchmark against
-hash table and binary search, two well-known data structures that can only support a subset of the ordered index operations. 
-Since they are data structures designed to specialize on a certain type of operation, 
-it demostrates the cost we took to support all operations simutanuously. 
+a widely-used hash table \cite{densehashset} and a carefully-engineered binary search algorithm (EBS \cite{binary_search_layout}), 
+two well-known methods that can only support a subset of the ordered index operations. 
+Since they are designed to specialize on a certain type of operation, 
+it demonstrates the cost we took to support all operations simultaneously. 
 The details of our benchmark rivals can be find below:
 \begin{itemize}
 [topsep=0pt,partopsep=0pt,itemsep=0pt,parsep=0pt,fullwidth,itemindent=\parindent,listparindent=\parindent]
@@ -1607,19 +1608,20 @@ We used Google's dense\_hash\_set \cite{densehashset},
 a quadratic probing hash table scheme widely used in industry.
 The effective load factor of the dense\_hash\_set is 60\%, 
 though the performance is almost the same with a effective load factor of 30\%.
+We resized the table at the beginning to prevent resize cost due to table overflow.
 \item \textit{EBS} \cite{binary_search_layout}: short for ``B-tree-like multi-way Search on Eytzinger-layout static array''. 
 As the name suggests, it is a carefully engineered binary search on a static data set, 
 so it supports $\lowerbound$ but not $\insertion$.
 The authors of \cite{binary_search_layout} concluded that this is the fastest binary search algorithm on large data sets 
 amongst a variety of binary search algorithm variants they investigated. 
-We used the variant that is emperically fastest on our machine, which uses 16-way implicit B-tree Eytzinger layout
+We used the variant that is empirically fastest on our machine, which uses 16-way implicit B-tree Eytzinger layout
 + ``low-level optimizations such as unrolling and conditional moves''
 (the ``btree16\_a'' variant in authors' benchmark). 
 EBS is around 2x faster than the straightforward approach of invoking std::lower\_bound on a sorted array.
 \item \textit{HOT} \cite{hot_sigmod18}: this is the fastest ordered index structure to the best of our knowledge. 
 We use the public-available implementation released along with the original paper.
 We believe we configured the library correctly,
-as the numbers we get generally match what are demostrated in the original paper (it is slightly slower 
+as the numbers we get generally match what are demonstrated in the original paper (it is slightly slower 
 because we are using a larger data set, and our CPU frequency is slower than the CPU in their paper).
 \item \textit{ART} \cite{arttrie_icde13}: this was the fastest ordered index structure we are aware of, before HOT was published.
 We use the public-available implementation released along with the original paper.
@@ -1763,25 +1765,25 @@ But still, when compared with state-of-the-art ordered index structures,
 on distribution $A$, we are 4.3x faster than HOT and ART on $\insertion$, 
 3.5x faster than HOT and 4.5x faster than ART on $\lookup$, 
 and more than 2x faster than HOT on $\lowerbound$. 
-On distrubition $B$, we are 3.1x faster than HOT, 4x faster than ART on $\insertion$, 
+On distribution $B$, we are 3.1x faster than HOT, 4x faster than ART on $\insertion$, 
 2.8x faster than HOT, 5.6x faster than ART on $\lookup$, 
 and 2x faster than HOT on $\lowerbound$.
 
 The comparison between $\MlpIndex$ and EBS is especially interesting. 
 It may look surprising at first glance: how could it be possible for one to support fast insertions, 
-while simutanuously having a faster lookup than a data structure specially designed for static data sets?
+while simultaneously having a faster lookup than a data structure specially designed for static data sets?
 Plus that, the EBS authors also carefully engineered their memory layouts 
 to optimize the cache efficiency, as well as used a B-tree-like structure to decrease the length of the search.
 The key comes in two points. First, we are an integer data structure, while EBS is a comparison-based data structure. 
-This allows us to achieve theoretically better complexity, specifically, $O(\log\log M)$ verus $O(\log n)$. 
+This allows us to achieve theoretically better complexity, specifically, $O(\log\log M)$ versus $O(\log n)$. 
 Second, our design allows us to effectively leverage MLP to further shorten the DRAM dependency chain, 
 while EBS, essentially a carefully-layouted B-tree, cannot effectively leverage MLP. 
 All it can do is move down the tree level by level, resulting in a longer DRAM dependency chain than us. 
 Despite that the static tree layout allows one to know the address of the children nodes without having 
 the parent node fetched into memory, 
 the best one can do to ``look-ahead'' one level is still to prefetch all the $B$ children of a B-tree node, 
-which turns out to be too costy. Indeed, the experiments in the authors' repository 
-showed that prefetching only slow things down for all ``B-tree Eytzinger'' category algorithms.
+which turns out to be too co sty. Indeed, the experiments in the authors' repository 
+showed that prefetching only slows things down for all ``B-tree Eytzinger'' category algorithms.
 But why is the performance difference between $\MlpIndex$ and EBS not so large? 
 The main reason is, EBS has an important advantage that we don't: it can leverage cache hierarchy much better than us. 
 Specifically, the top of its B-tree will be cache-resident, 
@@ -1819,7 +1821,7 @@ Plugging in the empirical formula in Section \ref{mlpmeasurement}, it should tak
 All a $\lookup$ does is checking the result of $\QueryLCP$, so 2.4 is the ``theoretical cost'' for $\lookup$. 
 For $\insertion$, if there is no hash table movement due to conflict, we will only write addresses that are cache-resident, 
 which are also considered free in our model. 
-By collecting statastics, we observed that the average length of cuckoo replacement chain is around 0.5 per $\insertion$. 
+By collecting statistics, we observed that the average length of cuckoo replacement chain is around 0.5 per $\insertion$. 
 So $\insertion$ should have a ``theoretical cost'' of 2.9.
 For $\lowerbound$, we always spend an additional DRAM request, 
 so it has a ``theoretical cost'' of 3.4. We compare the above theoretical cost with the practical time 
@@ -1842,12 +1844,12 @@ Insertion cost is amortized. $L$ represent the time for $\lookup$ in respective 
 \end{table}
 
 The ``base'' difference, i.e. the time needed to execute one $\QueryLCP$ or one $\lookup$, 
-is already explained by differece in average depth of the LCP node, which varies according to data set. 
+is already explained by difference in average depth of the LCP node, which varies according to data set. 
 So now we will focus on the delta between $\insertion$ / $\lowerbound$ operation and $\lookup$ operation.
 
 In the theory model, $\lowerbound$ should take 1 more DRAM roundtrip time than $\lookup$; 
 but in practice it takes around 1.2 more DRAM roundtrip time. 
-We believe the extra time is spent in finding the minimum child that is larger than the given one in the 256 fanouts of the LCP trie node. 
+We believe the extra time is spent in finding the minimum child that is larger than the given one in the 256 fan-outs of the LCP trie node. 
 We used multiple (cache-hitting) memory requests, SIMD operations and branches in the logic, 
 which, despite much faster than a cache miss, still requires non-negligible CPU time.
 
@@ -1882,7 +1884,7 @@ $\MlpIndex$ is currently single-threaded only.
 It would be interesting to support a multi-threaded version of $\MlpIndex$.
 What would be the best locking protocol for $\MlpIndex$? 
 Would it be fine-grained locking, read-optimized-write-exclusive locking, or even lock-free?
-How well would $\MlpIndex$ perform in multi-threaded scenerio, 
+How well would $\MlpIndex$ perform in multi-threaded scenario, 
 compared with other multi-threaded index structures, such as ROWEX ART \cite{art_sync}, Masstree \cite{masstree},
 lock-free skiplist \cite{lockfree_skiplist}, or Bw-Tree \cite{bwtree}?
 
@@ -1892,7 +1894,7 @@ For $\MlpIndex$, we will eventually need more than 2 layers of data structures,
 for sufficiently long key. But what length is the correct breaking point?
 What is the best ``query execution plan'' for each key length?
 For longer string keys, a lot of our sub-data-structures will only be managing a small set of keys. 
-What will be the best data structure to manage data of each magnitute? 
+What will be the best data structure to manage data of each magnitude? 
 How well would our data structure perform compared with HOT and ART, 
 as well as string-key-oriented data structure such as Masstree?
 Even more, would it be possible to combine string support and multi-threading support?
@@ -1904,15 +1906,15 @@ for example, Intel is planning to publish the non-volatile DIMM memory in 2019.
 Persistable through power-offs and byte-addressable, 
 although each access has a much higher latency than current memory chips. 
 Would it be possible to develop data structures that leverages memory level parallelism 
-on those new hardwares to mitigate the high latency? 
+on those new hardware to mitigate the high latency? 
 
 \section{Conclusion} \label{conclusion}
 
-In this paper, we demostrated that data structures that are designed to leverage high memory level parallelism 
+In this paper, we demonstrated that data structures that are designed to leverage high memory level parallelism 
 can achieve the performance not considered possible before, 
 typically a few times faster than the current state-of-the-arts. 
 
-\section*{Acknowledgements}
+\section*{Acknowledgments}
 
 I am grateful to my mentor Vladimir Kiriansky for his extensive help and discussions throughout the research 
 and the writing of this paper. Thanks Saman Amarasinghe, Yinzhan Xu and Martin Rinard for the review and advice on writing the paper. 
@@ -1925,3 +1927,23 @@ as well as their CTO Drew Paroski, for the permission to release my findings to 
 \end{document}
 
 
+
+%%  LocalWords:  Haoran Xu Amarasinghe Rinard CPUs roundtrip MLP APIs
+%%  LocalWords:  pipelining skiplist microarchitecture SIMD ns Epyc
+%%  LocalWords:  clockrate prefetcher Skylake prefetch analytics AMAC
+%%  LocalWords:  prefetching lookups prefetches unmaintainable MemSQL
+%%  LocalWords:  coroutine codebase trie roundtrips EBS ytzinger DDR
+%%  LocalWords:  earch Haswell struct uint idx branchy newIndex TLB
+%%  LocalWords:  oldSum th NUMA dereference PayloadType prefetched nL
+%%  LocalWords:  QueueItem enqueue ProcessQueueItem ProcessQueue sql
+%%  LocalWords:  newQueue pseudocode const benchmarked lockfree Radix
+%%  LocalWords:  SingleBox sharding vectorized adaptively Redis Prev
+%%  LocalWords:  Masstree subtree Succ prev succ IsLeaf nullptr LCP
+%%  LocalWords:  len QueryLCP logM bool newNode hashTable MLPIndex DS
+%%  LocalWords:  UpdateFields ary fullKey isSpecialIntermediateNode
+%%  LocalWords:  recurse currentDepth lcp lcpNode substring Emde STX
+%%  LocalWords:  prefixToFind fullKeyLen isAllSmallerThanKey amongst
+%%  LocalWords:  bucketized minKey occupyFlag indexLen pcLen xxHash
+%%  LocalWords:  vectorizable Eytzinger btree HashFn XORing Decrypt
+%%  LocalWords:  lastAnswer realInput layouted ROWEX Bw transactional
+%%  LocalWords:  snapshotting DIMM Persistable Yinzhan CTO Paroski

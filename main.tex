@@ -1803,7 +1803,7 @@ All it can do is move down the tree level by level, resulting in a longer DRAM d
 Despite that the static tree layout allows one to know the address of the children nodes without having 
 the parent node fetched into memory, 
 the best one can do to ``look-ahead'' one level is still to prefetch all the $B$ children of a B-tree node, 
-which turns out to be too co sty. Indeed, the experiments in the authors' repository 
+which turns out to be too costly. Indeed, the experiments in the authors' repository 
 showed that prefetching only slows things down for all ``B-tree Eytzinger'' category algorithms.
 But why is the performance difference between $\MlpIndex$ and EBS not so large? 
 The main reason is, EBS has an important advantage that we don't: it can leverage cache hierarchy much better than us. 
